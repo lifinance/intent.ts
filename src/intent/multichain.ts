@@ -6,10 +6,6 @@ import {
   parseAbiParameters,
 } from "viem";
 import {
-  INPUT_SETTLER_COMPACT_LIFI,
-  MULTICHAIN_INPUT_SETTLER_COMPACT,
-} from "../constants";
-import {
   MULTICHAIN_COMPACT_TYPEHASH_WITH_WITNESS,
   multichainCompactClaimHash,
 } from "./compact/claims";
@@ -162,25 +158,18 @@ export function computeMultichainCompactOrderId(
 export class MultichainOrderIntent
   implements OrderIntentCommon<MultichainOrder>
 {
-  lock?: EscrowLock | CompactLock;
+  lock: EscrowLock | CompactLock;
   inputSettler: `0x${string}`;
-  order: MultichainOrder;
+  private readonly order: MultichainOrder;
 
   constructor(
     inputSetter: `0x${string}`,
     order: MultichainOrder,
-    lock?: EscrowLock | CompactLock,
+    lock: EscrowLock | CompactLock,
   ) {
     this.inputSettler = inputSetter;
     this.order = order;
-
-    const isCompact =
-      this.inputSettler === INPUT_SETTLER_COMPACT_LIFI ||
-      this.inputSettler === MULTICHAIN_INPUT_SETTLER_COMPACT;
-
-    this.lock =
-      lock ??
-      ({ type: isCompact ? "compact" : "escrow" } as EscrowLock | CompactLock);
+    this.lock = lock;
   }
 
   asOrder(): MultichainOrder {
@@ -194,7 +183,7 @@ export class MultichainOrderIntent
   orderId(): `0x${string}` {
     const components = this.asComponents();
     const computedOrderIds = components.map((c) =>
-      this.lock?.type === "escrow"
+      this.lock.type === "escrow"
         ? computeMultichainEscrowOrderId(this.inputSettler, c.orderComponent)
         : computeMultichainCompactOrderId(
             this.inputSettler,
@@ -209,7 +198,7 @@ export class MultichainOrderIntent
         throw new Error(`Order ids are not equal ${computedOrderIds}`);
     });
 
-    if (this.lock?.type === "compact") {
+    if (this.lock.type === "compact") {
       const multichainCompactHash = multichainCompactClaimHash(
         this.asMultichainBatchCompact(),
       );
@@ -273,8 +262,6 @@ export class MultichainOrderIntent
   }[] {
     const { inputs, user, nonce, expires, fillDeadline, inputOracle, outputs } =
       this.order;
-    if (!this.lock)
-      throw new Error(`No lock provided, cannot compute secondaries.`);
     const secondaries =
       this.lock.type === "escrow"
         ? this.secondariesEscrow()

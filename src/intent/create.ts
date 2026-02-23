@@ -4,8 +4,6 @@ import type { IntentDeps } from "../deps";
 import type {
   CompactLock,
   CreateIntentOptions,
-  CreateIntentOptionsCompact,
-  CreateIntentOptionsEscrow,
   EscrowLock,
   MultichainOrder,
   StandardOrder,
@@ -22,7 +20,7 @@ import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
 export class Intent {
   private lock: EscrowLock | CompactLock;
 
-  private user: () => `0x${string}`;
+  private user: `0x${string}`;
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
@@ -33,17 +31,14 @@ export class Intent {
   private expiry = ONE_DAY;
   private fillDeadline = 2 * ONE_HOUR;
 
-  constructor(
-    opts: CreateIntentOptionsEscrow | CreateIntentOptionsCompact,
-    deps: IntentDeps,
-  ) {
+  constructor(opts: CreateIntentOptions, deps: IntentDeps) {
     this.lock = opts.lock;
     this.user = opts.account;
     this.inputs = opts.inputTokens;
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
     this.getOracle = deps.getOracle;
-    this.exclusiveFor = opts.exclusiveFor as `0x${string}`;
+    this.exclusiveFor = opts.exclusiveFor;
   }
 
   numInputChains() {
@@ -66,13 +61,9 @@ export class Intent {
   }
 
   nonce() {
-    if (this._nonce) return this._nonce;
-    this._nonce = BigInt(Math.floor(Math.random() * 2 ** 32));
+    if (this._nonce !== undefined) return this._nonce;
+    this._nonce = BigInt(1 + Math.floor(Math.random() * (2 ** 32 - 1)));
     return this._nonce;
-  }
-
-  inputSettler(multichain: boolean) {
-    return inputSettlerForLock(this.lock, multichain);
   }
 
   singlechain() {
@@ -101,7 +92,7 @@ export class Intent {
       : this.getOracle(this.verifier, inputChain)!;
 
     const order: StandardOrder = {
-      user: this.user(),
+      user: this.user,
       nonce: this.nonce(),
       originChainId: inputChain,
       fillDeadline: currentTime + this.fillDeadline,
@@ -114,12 +105,15 @@ export class Intent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         sameChain: this.isSameChain(),
-        recipient: this.user(),
+        recipient: this.user,
         currentTime,
       }),
     };
 
-    return new StandardOrderIntent(this.inputSettler(false), order);
+    return new StandardOrderIntent(
+      inputSettlerForLock(this.lock, false),
+      order,
+    );
   }
 
   multichain() {
@@ -152,7 +146,7 @@ export class Intent {
     });
 
     const order: MultichainOrder = {
-      user: this.user(),
+      user: this.user,
       nonce: this.nonce(),
       fillDeadline: currentTime + this.fillDeadline,
       expires: currentTime + this.expiry,
@@ -163,13 +157,17 @@ export class Intent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         sameChain: false,
-        recipient: this.user(),
+        recipient: this.user,
         currentTime,
       }),
       inputs,
     };
 
-    return new MultichainOrderIntent(this.inputSettler(true), order, this.lock);
+    return new MultichainOrderIntent(
+      inputSettlerForLock(this.lock, true),
+      order,
+      this.lock,
+    );
   }
 
   order() {

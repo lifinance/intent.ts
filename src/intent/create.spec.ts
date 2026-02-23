@@ -77,7 +77,7 @@ function makeEscrowOptions(
     inputTokens,
     outputTokens,
     verifier: "polymer",
-    account: () => TEST_USER,
+    account: TEST_USER,
     lock: { type: "escrow" },
   };
 }
@@ -131,6 +131,17 @@ describe("Intent", () => {
     expect(order.expires).toBe(TEST_NOW_SECONDS + 24 * 60 * 60);
     expect(order.nonce).toBe(2_147_483_648n);
     expect(intent.nonce()).toBe(2_147_483_648n);
+  });
+
+  it("generates a stable positive nonce and never emits zero", () => {
+    Math.random = () => 0;
+    const intent = new Intent(
+      makeEscrowOptions([ctx(ETH_USDC, 10n)], [ctx(ETH_WETH, 1n)]),
+      intentDeps,
+    );
+
+    expect(intent.nonce()).toBe(1n);
+    expect(intent.nonce()).toBe(1n);
   });
 
   it("throws when singlechain() is called for multichain input set", () => {

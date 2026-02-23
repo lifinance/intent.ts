@@ -106,7 +106,11 @@ type OrderEnvelope = {
 };
 
 function toHexString(value: unknown, field: string): `0x${string}` {
-  if (typeof value !== "string" || !value.startsWith("0x")) {
+  if (
+    typeof value !== "string" ||
+    !/^0x[0-9a-fA-F]*$/.test(value) ||
+    value.length % 2 !== 0
+  ) {
     throw new Error(`Order payload invalid: ${field}`);
   }
   return value as `0x${string}`;
@@ -114,15 +118,28 @@ function toHexString(value: unknown, field: string): `0x${string}` {
 
 function toBigIntValue(value: unknown, field: string): bigint {
   if (typeof value === "bigint") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return BigInt(value);
-  if (typeof value === "string" && value.length > 0) return BigInt(value);
+  if (typeof value === "number" && Number.isSafeInteger(value))
+    return BigInt(value);
+  if (typeof value === "string" && value.trim().length > 0) {
+    try {
+      return BigInt(value.trim());
+    } catch {
+      throw new Error(`Order payload invalid: ${field}`);
+    }
+  }
   throw new Error(`Order payload invalid: ${field}`);
 }
 
 function toNumberValue(value: unknown, field: string): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "bigint") return Number(value);
-  if (typeof value === "string" && value.length > 0) return Number(value);
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "bigint"
+        ? Number(value)
+        : typeof value === "string" && value.trim().length > 0
+          ? Number(value.trim())
+          : Number.NaN;
+  if (Number.isSafeInteger(parsed)) return parsed;
   throw new Error(`Order payload invalid: ${field}`);
 }
 
@@ -542,50 +559,37 @@ export class IntentApi {
   /**
    * @notice Fetches all intents from the LI.FI intent-api and then transmutes them into OrderContainers.
    */
-  async getAndParseOrders(): Promise<OrderContainer[] | undefined> {
+  async getAndParseOrders(): Promise<OrderContainer[]> {
     const response = await this.getOrders();
-    const parsedOrders = response.data;
-    if (parsedOrders) {
-      if (Array.isArray(parsedOrders)) {
-        // For each order, if a field is string ending in n, convert it to bigint.
-        return parsedOrders.map((instance) => {
-          instance.order.nonce = BigInt(instance.order.nonce);
-          instance.order.originChainId = BigInt(instance.order.originChainId);
-          if (instance.order.inputs) {
-            instance.order.inputs = instance.order.inputs.map((input) => {
-              return [BigInt(input[0]), BigInt(input[1])];
-            });
-          }
-          if (instance.order.outputs) {
-            instance.order.outputs = instance.order.outputs.map((output) => {
-              return {
-                ...output,
-                chainId: BigInt(output.chainId),
-                amount: BigInt(output.amount),
-              };
-            });
-          }
-          const allocatorSignature = instance.allocatorSignature
-            ? ({
-                type: "ECDSA",
-                payload: instance.allocatorSignature,
-              } as Signature)
-            : ({
-                type: "None",
-                payload: "0x",
-              } as NoSignature);
-          const sponsorSignature = instance.sponsorSignature
-            ? ({
-                type: "ECDSA",
-                payload: instance.sponsorSignature,
-              } as Signature)
-            : ({
-                type: "None",
-                payload: "0x",
-              } as NoSignature);
-          return { ...instance, allocatorSignature, sponsorSignature };
-        });
-      }
-    }
+    return response.data.map((instance) => {
+      const order: StandardOrder = {
+        ...instance.order,
+        nonce: BigInt(instance.order.nonce),
+        originChainId: BigInt(instance.order.originChainId),
+        inputs: instance.order.inputs.map(([tokenId, amount]) => [
+          BigInt(tokenId),
+          BigInt(amount),
+        ]),
+        outputs: instance.order.outputs.map((output) => ({
+          ...output,
+          chainId: BigInt(output.chainId),
+          amount: BigInt(output.amount),
+        })),
+      };
+      const allocatorSignature: Signature | NoSignature =
+        instance.allocatorSignature
+          ? { type: "ECDSA", payload: instance.allocatorSignature }
+          : { type: "None", payload: "0x" };
+      const sponsorSignature: Signature | NoSignature =
+        instance.sponsorSignature
+          ? { type: "ECDSA", payload: instance.sponsorSignature }
+          : { type: "None", payload: "0x" };
+      return {
+        inputSettler: instance.inputSettler,
+        order,
+        sponsorSignature,
+        allocatorSignature,
+      };
+    });
   }
 }

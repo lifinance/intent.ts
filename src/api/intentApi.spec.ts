@@ -149,4 +149,48 @@ describe("parseOrderStatusPayload", () => {
       "Order payload invalid: inputs[0]",
     );
   });
+
+  it("throws for invalid numeric strings", () => {
+    const payload = {
+      data: {
+        order: {
+          user: "0x1111111111111111111111111111111111111111",
+          nonce: "123",
+          originChainId: "8453",
+          expires: "abc",
+          fillDeadline: "NaN",
+          inputOracle: "0x0000000000000000000000000000000000000001",
+          inputs: [["1", "1000000"]],
+          outputs: [],
+        },
+        inputSettler: INPUT_SETTLER,
+      },
+    };
+
+    expect(() => parseOrderStatusPayload(payload)).toThrow(
+      "Order payload invalid: order.expires",
+    );
+  });
+
+  it("throws for non-finite numeric values", () => {
+    const payload = {
+      data: {
+        order: {
+          user: "0x1111111111111111111111111111111111111111",
+          nonce: "123",
+          originChainId: "8453",
+          expires: Infinity,
+          fillDeadline: 1_999_999_900,
+          inputOracle: "0x0000000000000000000000000000000000000001",
+          inputs: [["1", "1000000"]],
+          outputs: [],
+        },
+        inputSettler: INPUT_SETTLER,
+      },
+    };
+
+    expect(() => parseOrderStatusPayload(payload)).toThrow(
+      "Order payload invalid: order.expires",
+    );
+  });
 });

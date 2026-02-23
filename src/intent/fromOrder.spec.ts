@@ -31,6 +31,7 @@ describe("intent core split", () => {
     const intent = orderToIntent({
       inputSettler: MULTICHAIN_INPUT_SETTLER_ESCROW,
       order: makeMultichainOrder(),
+      lock: { type: "escrow" },
     });
 
     expect(intent).toBeInstanceOf(MultichainOrderIntent);

@@ -119,8 +119,7 @@ export function validateOrderWithReason({
   }
 
   // 4. inputs
-  if (!Array.isArray(order.inputs) || order.inputs.length === 0)
-    return fail(VALIDATION_ERRORS.NO_INPUTS);
+  if (order.inputs.length === 0) return fail(VALIDATION_ERRORS.NO_INPUTS);
   for (const input of order.inputs) {
     const [, amount] = input;
     if (amount <= 0n) return fail(VALIDATION_ERRORS.INPUT_AMOUNT_NON_POSITIVE);
@@ -136,8 +135,7 @@ export function validateOrderWithReason({
   // TODO: validate sponsor/allocator signatures when required.
 
   // 9. outputs
-  if (!Array.isArray(order.outputs) || order.outputs.length === 0)
-    return fail(VALIDATION_ERRORS.NO_OUTPUTS);
+  if (order.outputs.length === 0) return fail(VALIDATION_ERRORS.NO_OUTPUTS);
   for (const output of order.outputs) {
     const allowedOutputOracles = getAllowedOutputOracles({
       allowedOutputOracles: resolveOutputOracles,

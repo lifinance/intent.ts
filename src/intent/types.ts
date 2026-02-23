@@ -6,7 +6,6 @@ export interface OrderIntentCommon<
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;
-  order: TOrder;
   asOrder(): TOrder;
   inputChains(): bigint[];
   orderId(): `0x${string}`;

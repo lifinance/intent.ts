@@ -116,12 +116,11 @@ describe("standard intent", () => {
   });
 
   describe("StandardOrderIntent", () => {
-    it("returns the original order from accessor methods", () => {
+    it("returns the original order from asOrder", () => {
       const order = makeStandardOrder();
       const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(intent.asOrder()).toBe(order);
-      expect(intent.asStandardOrder()).toBe(order);
     });
 
     it("returns the origin chain as the only input chain", () => {

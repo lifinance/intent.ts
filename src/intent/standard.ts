@@ -40,7 +40,7 @@ export function computeStandardOrderId(
 
 export class StandardOrderIntent implements OrderIntentCommon<StandardOrder> {
   inputSettler: `0x${string}`;
-  order: StandardOrder;
+  private readonly order: StandardOrder;
 
   constructor(inputSetter: `0x${string}`, order: StandardOrder) {
     this.inputSettler = inputSetter;
@@ -48,10 +48,6 @@ export class StandardOrderIntent implements OrderIntentCommon<StandardOrder> {
   }
 
   asOrder(): StandardOrder {
-    return this.order;
-  }
-
-  asStandardOrder(): StandardOrder {
     return this.order;
   }
 
