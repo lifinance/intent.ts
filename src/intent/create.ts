@@ -52,11 +52,18 @@ export class Intent {
 
   isSameChain() {
     if (this.isMultichain()) return false;
-    const inputChain = this.inputs[0].token.chainId;
+    const [firstInput] = this.inputs;
+    const [firstOutput] = this.outputs;
+    if (!firstInput || !firstOutput) {
+      throw new Error(
+        "Intent requires at least one input and one output token",
+      );
+    }
+    const inputChain = firstInput.token.chainId;
     const outputChains = this.outputs.map((o) => o.token.chainId);
     const numOutputChains = [...new Set(outputChains)].length;
     if (numOutputChains > 1) return false;
-    const outputChain = this.outputs[0].token.chainId;
+    const outputChain = firstOutput.token.chainId;
     return inputChain === outputChain;
   }
 
@@ -73,7 +80,11 @@ export class Intent {
       );
     }
 
-    const inputChain = this.inputs[0].token.chainId;
+    const [firstInput] = this.inputs;
+    if (!firstInput) {
+      throw new Error("Intent requires at least one input token");
+    }
+    const inputChain = firstInput.token.chainId;
     const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
       this.lock.type === "compact"
         ? toId(
@@ -117,10 +128,14 @@ export class Intent {
   }
 
   multichain() {
+    const [firstInput] = this.inputs;
+    if (!firstInput) {
+      throw new Error("Intent requires at least one input token");
+    }
     const currentTime = Math.floor(Date.now() / 1000);
     const inputOracle = this.getOracle(
       this.verifier,
-      this.inputs[0].token.chainId,
+      firstInput.token.chainId,
     )!;
 
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [

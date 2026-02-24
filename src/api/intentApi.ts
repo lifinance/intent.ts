@@ -305,22 +305,6 @@ export class IntentApi {
     return error.code === "ERR_NETWORK" || error.code === "ECONNABORTED";
   }
 
-  private async waitForOnline(maxWaitMs = 15000) {
-    if (typeof window === "undefined" || typeof navigator === "undefined")
-      return;
-    if (navigator.onLine) return;
-    await Promise.race([
-      new Promise<void>((resolve) => {
-        const onOnline = () => {
-          window.removeEventListener("online", onOnline);
-          resolve();
-        };
-        window.addEventListener("online", onOnline, { once: true });
-      }),
-      IntentApi.sleep(maxWaitMs),
-    ]);
-  }
-
   private async postWithRetry<T>(
     path: string,
     body: unknown,
@@ -335,7 +319,6 @@ export class IntentApi {
         return response.data as T;
       } catch (error) {
         if (!IntentApi.isNetworkError(error) || attempt >= retries) throw error;
-        await this.waitForOnline();
         await IntentApi.sleep(baseDelayMs * 2 ** attempt);
         attempt += 1;
       }

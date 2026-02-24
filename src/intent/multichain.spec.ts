@@ -31,11 +31,14 @@ describe("multichain intent", () => {
 
     it("constructInputHash builds expected claim structure and validates chain index", () => {
       const additionalChains = [b32("a"), b32("b")];
+      const [firstAdditionalChain, secondAdditionalChain] = additionalChains;
+      if (!firstAdditionalChain || !secondAdditionalChain)
+        throw new Error("Expected additional chain hashes");
       const inputHash = hashMultichainInputs(1n, [[1n, 10n]]);
       const expected = keccak256(
         encodePacked(
           ["bytes32[]"],
-          [[additionalChains[0], inputHash, additionalChains[1]]],
+          [[firstAdditionalChain, inputHash, secondAdditionalChain]],
         ),
       );
 
@@ -71,12 +74,15 @@ describe("multichain intent", () => {
         },
       );
       const components = intent.asComponents();
+      const [firstComponent, secondComponent] = components;
+      if (!firstComponent || !secondComponent)
+        throw new Error("Expected two multichain components");
 
       expect(components.length).toBe(order.inputs.length);
-      expect(components[0].orderComponent.chainIndex).toBe(0n);
-      expect(components[1].orderComponent.chainIndex).toBe(1n);
-      expect(components[0].orderComponent.additionalChains.length).toBe(1);
-      expect(components[1].orderComponent.additionalChains.length).toBe(1);
+      expect(firstComponent.orderComponent.chainIndex).toBe(0n);
+      expect(secondComponent.orderComponent.chainIndex).toBe(1n);
+      expect(firstComponent.orderComponent.additionalChains.length).toBe(1);
+      expect(secondComponent.orderComponent.additionalChains.length).toBe(1);
 
       const orderId1 = intent.orderId();
       const orderId2 = intent.orderId();
@@ -97,12 +103,14 @@ describe("multichain intent", () => {
       );
       const components = intent.asComponents();
       const compactOrderId = intent.orderId();
+      const [firstInput] = order.inputs;
+      if (!firstInput) throw new Error("Expected first multichain input");
 
       expect(components.length).toBe(order.inputs.length);
       expect(
         components.every(
           (component) =>
-            component.orderComponent.chainIdField === order.inputs[0].chainId,
+            component.orderComponent.chainIdField === firstInput.chainId,
         ),
       ).toBe(true);
       expectBytes32Hex(compactOrderId);

@@ -15,6 +15,14 @@ It does not own:
 - UI behavior from app workspaces (`app/*`).
 - External orchestration wrappers that live outside this package (except core parsing helpers in `api/`).
 
+## Installation
+
+```sh
+npm install @lifi/lintent
+```
+
+Runtime target: Node.js 20+.
+
 ## Architecture
 
 - `types.ts`
@@ -71,8 +79,8 @@ Typical contributor path:
 Example: create/convert and derive order id.
 
 ```ts
-import { orderToIntent } from "@lifi/lintent/intent";
-import type { OrderContainer } from "@lifi/lintent/types";
+import { orderToIntent } from "@lifi/lintent";
+import type { OrderContainer } from "@lifi/lintent";
 
 function getOrderId(orderContainer: OrderContainer): `0x${string}` {
   return orderToIntent(orderContainer).orderId();
@@ -82,8 +90,8 @@ function getOrderId(orderContainer: OrderContainer): `0x${string}` {
 Example: branch behavior by order type during creation/execution logic.
 
 ```ts
-import { isStandardOrder, orderToIntent } from "@lifi/lintent/intent";
-import type { OrderContainer } from "@lifi/lintent/types";
+import { isStandardOrder, orderToIntent } from "@lifi/lintent";
+import type { OrderContainer } from "@lifi/lintent";
 
 function getInputCount(orderContainer: OrderContainer): number {
   if (isStandardOrder(orderContainer.order))

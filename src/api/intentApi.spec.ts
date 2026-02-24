@@ -94,7 +94,9 @@ describe("parseOrderStatusPayload", () => {
       throw new Error("Expected multichain order");
 
     expect(parsed.order.inputs.length).toBe(2);
-    expect(parsed.order.inputs[1].chainId).toBe(42161n);
+    const secondInput = parsed.order.inputs[1];
+    if (!secondInput) throw new Error("Expected second multichain input");
+    expect(secondInput.chainId).toBe(42161n);
     expect(parsed.sponsorSignature).toEqual({
       type: "ECDSA",
       payload: "0xbeef",

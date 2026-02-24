@@ -170,8 +170,11 @@ describe("Intent", () => {
     expect(multi).toBeInstanceOf(MultichainOrderIntent);
     expect(multi.inputSettler).toBe(MULTICHAIN_INPUT_SETTLER_ESCROW);
     expect(order.inputs.length).toBe(2);
-    expect(order.inputs[0].inputs.length).toBe(2);
-    expect(order.inputs[1].inputs.length).toBe(1);
+    const [firstInput, secondInput] = order.inputs;
+    if (!firstInput || !secondInput)
+      throw new Error("Expected two multichain input groups");
+    expect(firstInput.inputs.length).toBe(2);
+    expect(secondInput.inputs.length).toBe(1);
   });
 
   it("order() dispatches to singlechain or multichain intent", () => {

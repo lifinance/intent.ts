@@ -35,6 +35,10 @@ describe("standard intent", () => {
 
     it("changes when order-id fields change", () => {
       const baseOrder = makeStandardOrder();
+      const [firstInput] = baseOrder.inputs;
+      const [firstOutput] = baseOrder.outputs;
+      if (!firstInput || !firstOutput)
+        throw new Error("Expected standard order inputs and outputs");
       const baseId = computeStandardOrderId(
         INPUT_SETTLER_ESCROW_LIFI,
         baseOrder,
@@ -90,16 +94,14 @@ describe("standard intent", () => {
           name: "inputs",
           mutate: (order) => ({
             ...order,
-            inputs: [[order.inputs[0][0], order.inputs[0][1] + 1n]],
+            inputs: [[firstInput[0], firstInput[1] + 1n]],
           }),
         },
         {
           name: "outputs",
           mutate: (order) => ({
             ...order,
-            outputs: [
-              { ...order.outputs[0], amount: order.outputs[0].amount + 1n },
-            ],
+            outputs: [{ ...firstOutput, amount: firstOutput.amount + 1n }],
           }),
         },
       ];
@@ -170,6 +172,8 @@ describe("standard intent", () => {
 
     it("compactClaimHash changes when commitments or mandate fields change", () => {
       const baseOrder = makeStandardOrder();
+      const [baseOutput] = baseOrder.outputs;
+      if (!baseOutput) throw new Error("Expected standard order output");
       const baseIntent = new StandardOrderIntent(
         INPUT_SETTLER_ESCROW_LIFI,
         baseOrder,
@@ -179,8 +183,8 @@ describe("standard intent", () => {
         makeStandardOrder({
           outputs: [
             {
-              ...baseOrder.outputs[0],
-              amount: baseOrder.outputs[0].amount + 1n,
+              ...baseOutput,
+              amount: baseOutput.amount + 1n,
             },
           ],
         }),

@@ -58,10 +58,16 @@ export function constructInputHash(
   const claimStructure: `0x${string}`[] = [];
   for (let i = 0; i < numSegments; ++i) {
     const additionalChainsIndex = i > chainIndex ? i - 1 : i;
-    const inputHashElement =
-      chainIndex === BigInt(i)
-        ? inputHash
-        : additionalChains[additionalChainsIndex];
+    let inputHashElement: `0x${string}`;
+    if (chainIndex === BigInt(i)) {
+      inputHashElement = inputHash;
+    } else {
+      const additionalChain = additionalChains[additionalChainsIndex];
+      if (!additionalChain) {
+        throw new Error(`ChainIndexOutOfRange(${chainIndex},${numSegments})`);
+      }
+      inputHashElement = additionalChain;
+    }
     claimStructure[i] = inputHashElement;
   }
   return keccak256(encodePacked(["bytes32[]"], [claimStructure]));
@@ -192,7 +198,8 @@ export class MultichainOrderIntent
           ),
     );
 
-    const orderId = computedOrderIds[0];
+    const [orderId] = computedOrderIds;
+    if (!orderId) throw new Error("No order components available");
     computedOrderIds.map((v) => {
       if (v !== orderId)
         throw new Error(`Order ids are not equal ${computedOrderIds}`);
@@ -240,6 +247,8 @@ export class MultichainOrderIntent
     additionalChains: `0x${string}`[];
   }[] {
     const { inputs } = this.order;
+    const [firstInput] = inputs;
+    if (!firstInput) throw new Error("Multichain order requires inputs");
     const elements = this.asCompactElements().map((element) => {
       return hashStruct({
         types: compactTypes,
@@ -250,7 +259,7 @@ export class MultichainOrderIntent
     return inputs.map((_, i) => {
       return {
         // Preserve existing behaviour: chainIdField for compact uses the first input chain.
-        chainIdField: inputs[0].chainId,
+        chainIdField: firstInput.chainId,
         additionalChains: selectAllBut(elements, i),
       };
     });
@@ -270,10 +279,12 @@ export class MultichainOrderIntent
       chainId: bigint;
       orderComponent: MultichainOrderComponent;
     }[] = [];
-    for (let i = 0; i < inputs.length; ++i) {
-      const { chainIdField, additionalChains } = secondaries[i];
+    for (const [i, input] of inputs.entries()) {
+      const secondary = secondaries[i];
+      if (!secondary) throw new Error("Missing multichain secondary component");
+      const { chainIdField, additionalChains } = secondary;
       components.push({
-        chainId: inputs[i].chainId,
+        chainId: input.chainId,
         orderComponent: {
           user,
           nonce,
@@ -282,7 +293,7 @@ export class MultichainOrderIntent
           expires,
           fillDeadline,
           inputOracle,
-          inputs: inputs[i].inputs,
+          inputs: input.inputs,
           outputs,
           additionalChains,
         },

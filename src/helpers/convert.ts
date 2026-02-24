@@ -5,6 +5,7 @@ import { checksumAddress } from "viem";
 export function toBigIntWithDecimals(value: number, decimals: number): bigint {
   // Convert number to string in full precision
   const [intPart, decPart = ""] = value.toString().split(".");
+  const normalizedInt = (intPart ?? "0").replace(/^(-?)0+(?=\d)/, "$1");
 
   // Take up to `decimals` digits of the decimal part
   const truncatedDec = decPart.slice(0, decimals);
@@ -13,7 +14,6 @@ export function toBigIntWithDecimals(value: number, decimals: number): bigint {
   const paddedDec = truncatedDec.padEnd(decimals, "0");
 
   // Remove leading zeros from intPart just in case
-  const normalizedInt = intPart.replace(/^(-?)0+(?=\d)/, "$1");
   // Combine parts
   const combined = (normalizedInt + paddedDec).replace(".", "");
 
