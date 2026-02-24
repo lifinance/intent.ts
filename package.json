@@ -1,7 +1,7 @@
 {
   "name": "@lifi/intent",
   "private": false,
-  "version": "0.0.1",
+  "version": "0.0.1-alpha",
   "description": "Typescript library for OIF and LI.FI Intent",
   "repository": {
     "type": "git",
@@ -14,8 +14,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "README.md",
-    "LICENSE"
+    "README.md"
   ],
   "module": "./dist/index.js",
   "exports": {

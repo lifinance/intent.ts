@@ -1,0 +1,76 @@
+name: Release & Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-alpha.*'
+      - 'v*.*.*-beta.*'
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag format
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+            echo "Invalid release tag format: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          generate_release_notes: true
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+
+  publish:
+    permissions:
+      contents: write
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag format
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+            echo "Invalid release tag format: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build
+        run: bun run build
+      - name: Check
+        run: bun run check
+      - name: Test
+        run: bun run test
+      - name: Publish to npm
+        run: |
+          publish_tag=""
+          if [[ "${GITHUB_REF_NAME}" == *alpha* ]]; then
+            publish_tag="--tag alpha"
+          elif [[ "${GITHUB_REF_NAME}" == *beta* ]]; then
+            publish_tag="--tag beta"
+          fi
+          npm publish --access public --provenance ${publish_tag}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
