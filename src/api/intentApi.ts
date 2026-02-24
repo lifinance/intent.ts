@@ -1,4 +1,4 @@
-import axios from "axios";
+import ky, { HTTPError } from "ky";
 import type {
   MultichainOrder,
   NoSignature,
@@ -284,45 +284,9 @@ export class IntentApi {
   baseUrl: string;
   websocketUrl: string;
 
-  api;
-
   constructor(mainnet: boolean) {
     this.baseUrl = IntentApi.getIntentApiUrl(mainnet);
     this.websocketUrl = IntentApi.getIntentApiWssUrl(mainnet);
-
-    this.api = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 15000,
-    });
-  }
-
-  private static sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  private static isNetworkError(error: unknown): boolean {
-    if (!axios.isAxiosError(error)) return false;
-    return error.code === "ERR_NETWORK" || error.code === "ECONNABORTED";
-  }
-
-  private async postWithRetry<T>(
-    path: string,
-    body: unknown,
-    opts: { retries?: number; baseDelayMs?: number } = {},
-  ): Promise<T> {
-    const retries = opts.retries ?? 2;
-    const baseDelayMs = opts.baseDelayMs ?? 500;
-    let attempt = 0;
-    while (true) {
-      try {
-        const response = await this.api.post(path, body);
-        return response.data as T;
-      } catch (error) {
-        if (!IntentApi.isNetworkError(error) || attempt >= retries) throw error;
-        await IntentApi.sleep(baseDelayMs * 2 ** attempt);
-        attempt += 1;
-      }
-    }
   }
 
   static getIntentApiUrl(mainnet: boolean) {
@@ -340,10 +304,12 @@ export class IntentApi {
    */
   async submitOrder(request: SubmitOrderDto) {
     try {
-      return await this.postWithRetry("/orders/submit", request, {
-        retries: 2,
-        baseDelayMs: 600,
-      });
+      return await ky
+        .post(new URL("/orders/submit", this.baseUrl), {
+          json: request,
+          timeout: 15000,
+        })
+        .json();
     } catch (error) {
       console.error("Error submitting order:", error);
       throw error;
@@ -357,10 +323,12 @@ export class IntentApi {
    */
   async getOrders(options?: { user?: `0x${string}`; status?: OrderStatus }) {
     try {
-      const response = await this.api.get("/orders", {
-        params: { limit: 50, offset: 0, ...options },
-      });
-      return response.data as GetOrderResponse;
+      return await ky
+        .get(new URL("/orders", this.baseUrl), {
+          searchParams: { limit: 50, offset: 0, ...options },
+          timeout: 15000,
+        })
+        .json<GetOrderResponse>();
     } catch (error) {
       console.error("Error getting orders:", error);
       throw error;
@@ -375,12 +343,15 @@ export class IntentApi {
     orderId: `0x${string}`,
   ): Promise<OrderContainer> {
     try {
-      const response = await this.api.get("/orders/status/", {
-        params: { onChainOrderId: orderId },
-      });
-      return parseOrderStatusPayload(response.data);
+      const response = await ky
+        .get(new URL("/orders/status/", this.baseUrl), {
+          searchParams: { onChainOrderId: orderId },
+          timeout: 15000,
+        })
+        .json();
+      return parseOrderStatusPayload(response);
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
+      if (error instanceof HTTPError && error.response.status === 404) {
         throw new Error("Order not found");
       }
       if (
@@ -455,10 +426,12 @@ export class IntentApi {
       rq.intent.metadata = { exclusiveFor };
 
     try {
-      return await this.postWithRetry<GetQuoteResponse>("/quote/request", rq, {
-        retries: 3,
-        baseDelayMs: 700,
-      });
+      return await ky
+        .post(new URL("/quote/request", this.baseUrl), {
+          json: rq,
+          timeout: 15000,
+        })
+        .json<GetQuoteResponse>();
     } catch (error) {
       console.error("Error fetching quote:", error);
       throw error;
