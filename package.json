@@ -1,7 +1,7 @@
 {
-  "name": "@lifi/lintent",
+  "name": "@lifi/intent",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Typescript library for OIF and LI.FI Intent",
   "repository": {
     "type": "git",
