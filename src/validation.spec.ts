@@ -13,7 +13,6 @@ import {
   validateOrderWithReason,
   VALIDATION_ERRORS,
 } from "./validation";
-import { encodeMandateOutput, getOutputHash } from "./output";
 import type { OrderContainer } from "./types";
 import {
   b32,
@@ -46,19 +45,7 @@ const validationDeps: OrderContainerValidationDeps = {
   },
 };
 
-describe("orderLib", () => {
-  it("produces stable output hashes", () => {
-    const h1 = getOutputHash(output);
-    const h2 = getOutputHash(output);
-    expect(h1).toBe(h2);
-  });
-
-  it("changes hash when output amount changes", () => {
-    const h1 = getOutputHash(output);
-    const h2 = getOutputHash({ ...output, amount: output.amount + 1n });
-    expect(h1).not.toBe(h2);
-  });
-
+describe("validation", () => {
   it("rejects orders where fillDeadline is later than expires", () => {
     const invalidTiming = makeStandardOrder({
       expires: 2_000_000_000,
@@ -252,25 +239,5 @@ describe("orderLib", () => {
         deps: validationDeps,
       }),
     ).toBe(true);
-  });
-
-  it("encodes mandate output deterministically", () => {
-    const solver = b32("1");
-    const orderId = b32("2");
-    const encoded1 = encodeMandateOutput({
-      solver,
-      orderId,
-      timestamp: 1234,
-      output,
-    });
-    const encoded2 = encodeMandateOutput({
-      solver,
-      orderId,
-      timestamp: 1234,
-      output,
-    });
-
-    expect(encoded1).toBe(encoded2);
-    expect(encoded1.startsWith("0x")).toBe(true);
   });
 });

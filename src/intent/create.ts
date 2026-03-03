@@ -8,7 +8,7 @@ import type {
   MultichainOrder,
   StandardOrder,
   TokenContext,
-} from "../types";
+} from "../types/index";
 import { MultichainOrderIntent } from "./multichain";
 import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";

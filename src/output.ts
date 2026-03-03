@@ -1,5 +1,5 @@
 import { encodePacked, keccak256 } from "viem";
-import type { MandateOutput } from "./types";
+import type { MandateOutput } from "./types/index";
 
 export function getOutputHash(output: MandateOutput) {
   return keccak256(

@@ -6,8 +6,8 @@ import type {
   Quote,
   Signature,
   StandardOrder,
-} from "../types";
-import { isStandardOrder } from "../intent";
+} from "../types/index";
+import { isStandardOrder } from "../intent/index";
 import { getInteropableAddress } from "../helpers/interopableAddress";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";

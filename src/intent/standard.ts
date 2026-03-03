@@ -3,7 +3,7 @@ import { INPUT_SETTLER_COMPACT_LIFI } from "../constants";
 import { compactClaimHash } from "./compact/claims";
 import { toStandardBatchCompact } from "./compact/conversions";
 import { encodeOutputs } from "./helpers/output-encoding";
-import type { BatchCompact, StandardOrder } from "../types";
+import type { BatchCompact, StandardOrder } from "../types/index";
 import type { OrderIntentCommon } from "./types";
 
 export function computeStandardOrderId(

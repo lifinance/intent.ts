@@ -9,8 +9,8 @@ import {
   MULTICHAIN_INPUT_SETTLER_COMPACT,
 } from "./constants";
 import { addressToBytes32 } from "./helpers/convert";
-import { isStandardOrder } from "./intent";
-import type { OrderContainer, StandardOrder } from "./types";
+import { isStandardOrder } from "./intent/index";
+import type { OrderContainer, StandardOrder } from "./types/index";
 
 export type ValidationResult = {
   passed: boolean;
