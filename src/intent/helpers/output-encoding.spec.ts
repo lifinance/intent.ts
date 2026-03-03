@@ -110,6 +110,23 @@ describe("output encoding helpers", () => {
     );
   });
 
+  it("emits empty context when exclusiveFor is omitted", () => {
+    const output = buildMandateOutputs({
+      outputTokens,
+      getOracle() {
+        return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+      },
+      verifier: "polymer",
+      sameChain: false,
+      recipient: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      currentTime: 1_700_000_000,
+    });
+    const [first] = output;
+    if (!first) throw new Error("Expected one output");
+
+    expect(first.context).toBe("0x");
+  });
+
   it("rejects malformed exclusiveFor addresses", () => {
     expect(() =>
       buildMandateOutputs({

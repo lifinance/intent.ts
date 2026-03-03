@@ -3,7 +3,7 @@ import type { CompactLock, EscrowLock } from "./lock";
 import type { TokenContext } from "./token";
 
 type CreateIntentOptionsBase = {
-  exclusiveFor: `0x${string}`;
+  exclusiveFor?: `0x${string}`;
   inputTokens: TokenContext[];
   outputTokens: TokenContext[];
   verifier: CoreVerifier;
