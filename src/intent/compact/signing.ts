@@ -1,9 +1,10 @@
 import { COMPACT } from "../../constants";
 import { compactTypes } from "../../typedMessage";
 import type { BatchCompact, MultichainCompact } from "../../types";
-import type { WalletClient } from "viem";
 
-export type TypedDataSigner = Pick<WalletClient, "signTypedData">;
+export type TypedDataSigner = {
+  signTypedData: (args: unknown) => Promise<`0x${string}`>;
+};
 
 export function signStandardCompact(
   account: `0x${string}`,

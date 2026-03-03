@@ -136,6 +136,16 @@ These utilities are the core gate for normalizing and validating inbound order d
   - Container validation receives `OrderContainerValidationDeps` (`{ orderContainer, deps }`), adding `inputSettlers` for compact input-settler policy.
   - Core-internal protocol constants live in `constants.ts`.
 
+## Test Layout
+
+- Unit tests are colocated with features in `src/**/<feature>.spec.ts`.
+- Every non-`index.ts` runtime module in `src/` must have a sibling `.spec.ts`.
+- `index.ts` barrel files are excluded from that requirement.
+- Type-only modules (for example `src/types/**` and `src/intent/types.ts`) should not have individual `.spec.ts` coverage.
+- Rely on TypeScript checks and behavior tests that consume those types.
+- Integration tests live under `tests/`.
+- Bare spec files in `src/` (no sibling source module) are not allowed.
+
 ## Safe Change Checklist
 
 - Use `isStandardOrder(...)` for order branching, not ad-hoc property checks.

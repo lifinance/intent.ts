@@ -1,4 +1,4 @@
-import type { MultichainOrder, StandardOrder } from "../types";
+import type { MultichainOrder, StandardOrder } from "../types/index";
 
 export interface OrderIntentCommon<
   TOrder extends StandardOrder | MultichainOrder =

@@ -25,7 +25,7 @@ import type {
   MultichainCompact,
   MultichainOrder,
   MultichainOrderComponent,
-} from "../types";
+} from "../types/index";
 import type { OrderIntentCommon } from "./types";
 
 /**
