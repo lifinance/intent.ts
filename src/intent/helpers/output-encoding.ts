@@ -15,7 +15,7 @@ export function encodeOutputs(outputs: MandateOutput[]) {
 }
 
 export function buildMandateOutputs(options: {
-  exclusiveFor: `0x${string}`;
+  exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
   getOracle: IntentDeps["getOracle"];
   verifier: CoreVerifier;

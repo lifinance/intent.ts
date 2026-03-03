@@ -25,7 +25,7 @@ export class Intent {
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
   private verifier: string;
-  private exclusiveFor: `0x${string}`;
+  private exclusiveFor?: `0x${string}`;
 
   private _nonce?: bigint;
   private expiry = ONE_DAY;

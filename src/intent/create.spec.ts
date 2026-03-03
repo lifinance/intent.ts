@@ -133,6 +133,22 @@ describe("Intent", () => {
     expect(intent.nonce()).toBe(2_147_483_648n);
   });
 
+  it("issues a limit order with empty output context when exclusiveFor is omitted", () => {
+    const intent = new Intent(
+      {
+        inputTokens: [ctx(ETH_USDC, 10n)],
+        outputTokens: [ctx(ETH_WETH, 1n)],
+        verifier: "polymer",
+        account: TEST_USER,
+        lock: { type: "escrow" },
+      },
+      intentDeps,
+    );
+    const order = intent.singlechain().asOrder();
+
+    expect(order.outputs.every((output) => output.context === "0x")).toBe(true);
+  });
+
   it("generates a stable positive nonce and never emits zero", () => {
     Math.random = () => 0;
     const intent = new Intent(
