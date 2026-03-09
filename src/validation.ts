@@ -8,10 +8,10 @@ import {
   INPUT_SETTLER_COMPACT_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
 } from "./constants";
+import { addressToBytes32 } from "./helpers/convert";
 
 import { isStandardOrder } from "./intent/index";
 import type { OrderContainer, StandardOrder } from "./types/index";
-import { addressToBytes32 } from "./helpers/convert";
 
 export type ValidationResult = {
   passed: boolean;
