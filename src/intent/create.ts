@@ -14,6 +14,18 @@ import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
 import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
 
+function buildInputPairs(
+  lock: EscrowLock | CompactLock,
+  inputs: TokenContext[],
+): [bigint, bigint][] {
+  return inputs.map(({ token, amount }) => [
+    lock.type === "compact"
+      ? toId(true, lock.resetPeriod, lock.allocatorId, token.address)
+      : BigInt(token.address),
+    amount,
+  ]);
+}
+
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
  */
@@ -24,8 +36,10 @@ export class Intent {
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
+  private getSettler: IntentDeps["getSettler"];
   private verifier: string;
   private exclusiveFor?: `0x${string}`;
+  private outputRecipient?: `0x${string}`;
 
   private _nonce?: bigint;
   private expiry = ONE_DAY;
@@ -38,7 +52,9 @@ export class Intent {
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
     this.getOracle = deps.getOracle;
+    this.getSettler = deps.getSettler;
     this.exclusiveFor = opts.exclusiveFor;
+    this.outputRecipient = opts.outputRecipient;
   }
 
   numInputChains() {
@@ -85,17 +101,7 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const inputChain = firstInput.token.chainId;
-    const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
-      this.lock.type === "compact"
-        ? toId(
-            true,
-            this.lock.resetPeriod,
-            this.lock.allocatorId,
-            token.address,
-          )
-        : BigInt(token.address),
-      amount,
-    ]);
+    const inputs = buildInputPairs(this.lock, this.inputs);
 
     const currentTime = Math.floor(Date.now() / 1000);
     const inputOracle = this.isSameChain()
@@ -114,9 +120,11 @@ export class Intent {
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
         getOracle: this.getOracle,
+        getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: this.isSameChain(),
         recipient: this.user,
+        outputRecipient: this.outputRecipient,
         currentTime,
       }),
     };
@@ -146,17 +154,7 @@ export class Intent {
       );
       return {
         chainId: chain,
-        inputs: chainInputs.map(({ token, amount }) => [
-          this.lock.type === "compact"
-            ? toId(
-                true,
-                this.lock.resetPeriod,
-                this.lock.allocatorId,
-                token.address,
-              )
-            : BigInt(token.address),
-          amount,
-        ]),
+        inputs: buildInputPairs(this.lock, chainInputs),
       };
     });
 
@@ -170,9 +168,11 @@ export class Intent {
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
         getOracle: this.getOracle,
+        getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: false,
         recipient: this.user,
+        outputRecipient: this.outputRecipient,
         currentTime,
       }),
       inputs,

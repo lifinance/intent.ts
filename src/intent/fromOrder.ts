@@ -47,7 +47,18 @@ function inferLock(inputSettler: `0x${string}`): EscrowLock | CompactLock {
 }
 
 export function isStandardOrder(order: OrderLike): order is StandardOrder {
-  return "originChainId" in order;
+  return "originChainId" in order && "inputs" in order;
+}
+
+/**
+ * Returns true if the order originated on Solana.
+ * Solana-origin orders have a 32-byte user field (pubkey as bytes32)
+ * rather than the 20-byte EVM address used in standard EVM orders.
+ */
+export function isSolanaOriginOrder(
+  order: StandardOrder | MultichainOrder,
+): boolean {
+  return order.user.length === 66; // 0x + 64 hex chars = 32 bytes
 }
 
 export function orderToIntent(

@@ -1,5 +1,7 @@
 export { Intent } from "./create";
-export { isStandardOrder, orderToIntent } from "./fromOrder";
+export { SolanaIntent } from "./createSolana";
+export { SolanaStandardOrderIntent } from "./solana";
+export { isStandardOrder, isSolanaOriginOrder, orderToIntent } from "./fromOrder";
 export { StandardOrderIntent, computeStandardOrderId } from "./standard";
 export type { OrderIntentCommon } from "./types";
 export {

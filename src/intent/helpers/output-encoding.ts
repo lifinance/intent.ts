@@ -18,18 +18,22 @@ export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
   getOracle: IntentDeps["getOracle"];
+  getSettler?: IntentDeps["getSettler"];
   verifier: CoreVerifier;
   sameChain: boolean;
   recipient: `0x${string}`;
+  outputRecipient?: `0x${string}`;
   currentTime: number;
 }): MandateOutput[] {
   const {
     exclusiveFor,
     outputTokens,
     getOracle,
+    getSettler,
     verifier,
     sameChain,
     recipient,
+    outputRecipient,
     currentTime,
   } = options;
 
@@ -50,8 +54,8 @@ export function buildMandateOutputs(options: {
     );
   }
 
-  const outputSettler = COIN_FILLER;
   return outputTokens.map(({ token, amount }) => {
+    const outputSettler = getSettler?.(token.chainId) ?? COIN_FILLER;
     const outputOracle = sameChain
       ? addressToBytes32(outputSettler)
       : addressToBytes32(getOracle(verifier, token.chainId)!);
@@ -61,7 +65,7 @@ export function buildMandateOutputs(options: {
       chainId: token.chainId,
       token: addressToBytes32(token.address),
       amount: amount,
-      recipient: addressToBytes32(recipient),
+      recipient: outputRecipient ?? addressToBytes32(recipient),
       callbackData: "0x",
       context,
     };

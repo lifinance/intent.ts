@@ -5,6 +5,15 @@ export type IntentDeps = {
     verifier: CoreVerifier,
     chainId: bigint,
   ) => `0x${string}` | undefined;
+  getSettler?: (chainId: bigint) => `0x${string}` | undefined;
+};
+
+export type SolanaIntentDeps = {
+  inputOracle: `0x${string}`;
+  getOracle: (
+    verifier: CoreVerifier,
+    chainId: bigint,
+  ) => `0x${string}` | undefined;
 };
 
 export type StandardOrderValidationDeps = {

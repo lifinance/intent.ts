@@ -8,6 +8,7 @@ type CreateIntentOptionsBase = {
   outputTokens: TokenContext[];
   verifier: CoreVerifier;
   account: `0x${string}`;
+  outputRecipient?: `0x${string}`;
 };
 
 export type CreateIntentOptionsEscrow = CreateIntentOptionsBase & {

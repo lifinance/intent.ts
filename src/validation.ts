@@ -9,6 +9,13 @@ import {
   MULTICHAIN_INPUT_SETTLER_COMPACT,
 } from "./constants";
 import { addressToBytes32 } from "./helpers/convert";
+
+/** Normalize any hex string (20-byte address or 32-byte hash) to a lowercase 0x-prefixed bytes32. */
+function toBytes32(hex: `0x${string}`): `0x${string}` {
+  const raw = hex.replace("0x", "");
+  if (raw.length === 64) return `0x${raw}` as `0x${string}`;
+  return addressToBytes32(hex);
+}
 import { isStandardOrder } from "./intent/index";
 import type { OrderContainer, StandardOrder } from "./types/index";
 
@@ -74,7 +81,7 @@ function getAllowedOutputOracles({
   const allowed = allowedOutputOracles(chainId);
   if (!allowed) return undefined;
   return [COIN_FILLER, ...allowed]
-    .map((oracle) => addressToBytes32(oracle))
+    .map((oracle) => toBytes32(oracle))
     .map(normalize);
 }
 
@@ -82,7 +89,7 @@ function getAllowedOutputSettlers(
   allowedOutputSettlers: StandardOrderValidationDeps["allowedOutputSettlers"],
 ): string[] {
   return allowedOutputSettlers()
-    .map((settler) => addressToBytes32(settler))
+    .map((settler) => toBytes32(settler))
     .map(normalize);
 }
 
