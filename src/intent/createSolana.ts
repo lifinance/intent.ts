@@ -63,8 +63,7 @@ export class SolanaIntent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         sameChain: false,
-        recipient: this.account,
-        outputRecipient: this.outputRecipient,
+        bytes32Recipient: this.outputRecipient ?? this.account,
         currentTime,
       }),
     };

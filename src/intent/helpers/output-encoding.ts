@@ -21,8 +21,7 @@ export function buildMandateOutputs(options: {
   getSettler?: IntentDeps["getSettler"];
   verifier: CoreVerifier;
   sameChain: boolean;
-  recipient: `0x${string}`;
-  outputRecipient?: `0x${string}`;
+  bytes32Recipient: `0x${string}`;
   currentTime: number;
 }): MandateOutput[] {
   const {
@@ -32,8 +31,7 @@ export function buildMandateOutputs(options: {
     getSettler,
     verifier,
     sameChain,
-    recipient,
-    outputRecipient,
+    bytes32Recipient,
     currentTime,
   } = options;
 
@@ -65,7 +63,7 @@ export function buildMandateOutputs(options: {
       chainId: token.chainId,
       token: addressToBytes32(token.address),
       amount: amount,
-      recipient: outputRecipient ?? addressToBytes32(recipient),
+      recipient: bytes32Recipient,
       callbackData: "0x",
       context,
     };

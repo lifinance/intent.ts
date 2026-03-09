@@ -13,6 +13,7 @@ import { MultichainOrderIntent } from "./multichain";
 import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
 import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
+import { addressToBytes32 } from "../helpers/convert";
 
 
 /**
@@ -106,7 +107,8 @@ export class Intent {
     const inputOracle = this.isSameChain()
       ? COIN_FILLER
       : this.getOracle(this.verifier, inputChain)!;
-
+    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.user);
+    
     const order: StandardOrder = {
       user: this.user,
       nonce: this.nonce(),
@@ -122,8 +124,7 @@ export class Intent {
         getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: this.isSameChain(),
-        recipient: this.user,
-        outputRecipient: this.outputRecipient,
+        bytes32Recipient,
         currentTime,
       }),
     };
@@ -144,7 +145,7 @@ export class Intent {
       this.verifier,
       firstInput.token.chainId,
     )!;
-
+    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.user);
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),
     ].map((chain) => {
@@ -181,8 +182,7 @@ export class Intent {
         getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: false,
-        recipient: this.user,
-        outputRecipient: this.outputRecipient,
+        bytes32Recipient,
         currentTime,
       }),
       inputs,
