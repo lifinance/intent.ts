@@ -23,6 +23,7 @@ export function toBigIntWithDecimals(value: number, decimals: number): bigint {
 export function addressToBytes32(address: `0x${string}`): `0x${string}` {
   if (address.length === 66) return address; // already bytes32 with 0x prefix
   if (address.length === 64) return `0x${address}`; // already bytes32 without 0x
+  // Accept only EVM addresses here.
   if (address.length !== 42 && address.length !== 40) {
     throw new Error(`Invalid address length: ${address.length}`);
   }

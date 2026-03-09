@@ -14,17 +14,6 @@ import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
 import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
 
-function buildInputPairs(
-  lock: EscrowLock | CompactLock,
-  inputs: TokenContext[],
-): [bigint, bigint][] {
-  return inputs.map(({ token, amount }) => [
-    lock.type === "compact"
-      ? toId(true, lock.resetPeriod, lock.allocatorId, token.address)
-      : BigInt(token.address),
-    amount,
-  ]);
-}
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -101,7 +90,17 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const inputChain = firstInput.token.chainId;
-    const inputs = buildInputPairs(this.lock, this.inputs);
+    const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
+      this.lock.type === "compact"
+        ? toId(
+            true,
+            this.lock.resetPeriod,
+            this.lock.allocatorId,
+            token.address,
+          )
+        : BigInt(token.address),
+      amount,
+    ]);
 
     const currentTime = Math.floor(Date.now() / 1000);
     const inputOracle = this.isSameChain()
@@ -154,9 +153,20 @@ export class Intent {
       );
       return {
         chainId: chain,
-        inputs: buildInputPairs(this.lock, chainInputs),
+        inputs: chainInputs.map(({ token, amount }) => [
+          this.lock.type === "compact"
+            ? toId(
+                true,
+                this.lock.resetPeriod,
+                this.lock.allocatorId,
+                token.address,
+              )
+            : BigInt(token.address),
+          amount,
+        ]),
       };
     });
+
 
     const order: MultichainOrder = {
       user: this.user,
