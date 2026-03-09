@@ -22,7 +22,7 @@ import { addressToBytes32 } from "../helpers/convert";
 export class Intent {
   private lock: EscrowLock | CompactLock;
 
-  private user: `0x${string}`;
+  private walletUser: `0x${string}`;
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
@@ -37,7 +37,7 @@ export class Intent {
 
   constructor(opts: CreateIntentOptions, deps: IntentDeps) {
     this.lock = opts.lock;
-    this.user = opts.account;
+    this.walletUser = opts.account;
     this.inputs = opts.inputTokens;
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
@@ -107,10 +107,10 @@ export class Intent {
     const inputOracle = this.isSameChain()
       ? COIN_FILLER
       : this.getOracle(this.verifier, inputChain)!;
-    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.user);
+    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     
     const order: StandardOrder = {
-      user: this.user,
+      user: this.walletUser,
       nonce: this.nonce(),
       originChainId: inputChain,
       fillDeadline: currentTime + this.fillDeadline,
@@ -145,7 +145,7 @@ export class Intent {
       this.verifier,
       firstInput.token.chainId,
     )!;
-    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.user);
+    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),
     ].map((chain) => {
@@ -170,7 +170,7 @@ export class Intent {
 
 
     const order: MultichainOrder = {
-      user: this.user,
+      user: this.walletUser,
       nonce: this.nonce(),
       fillDeadline: currentTime + this.fillDeadline,
       expires: currentTime + this.expiry,

@@ -1,4 +1,5 @@
 import type { SolanaIntentDeps } from "../deps";
+import { addressToBytes32 } from "../helpers/convert";
 import type {
   CreateSolanaIntentOptions,
   SolanaStandardOrder,
@@ -12,7 +13,7 @@ import { SolanaStandardOrderIntent } from "./solana";
  * Produces a SolanaStandardOrderIntent with a single SPL token input.
  */
 export class SolanaIntent {
-  private account: `0x${string}`;
+  private walletUser: `0x${string}`;
   private inputToken: CreateSolanaIntentOptions["inputToken"];
   private outputs: CreateSolanaIntentOptions["outputTokens"];
   private getOracle: SolanaIntentDeps["getOracle"];
@@ -26,7 +27,7 @@ export class SolanaIntent {
   private fillDeadline = 2 * ONE_HOUR;
 
   constructor(opts: CreateSolanaIntentOptions, deps: SolanaIntentDeps) {
-    this.account = opts.account;
+    this.walletUser = opts.account;
     this.inputToken = opts.inputToken;
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
@@ -47,7 +48,7 @@ export class SolanaIntent {
     const { token, amount } = this.inputToken;
 
     const solanaOrder: SolanaStandardOrder = {
-      user: this.account,
+      user: this.walletUser,
       nonce: this.nonce(),
       originChainId: token.chainId,
       expires: currentTime + this.expiry,
@@ -63,7 +64,7 @@ export class SolanaIntent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         sameChain: false,
-        bytes32Recipient: this.outputRecipient ?? this.account,
+        bytes32Recipient: this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser),
         currentTime,
       }),
     };
