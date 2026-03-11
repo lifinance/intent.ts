@@ -5,22 +5,25 @@ import type {
   CompactLock,
   CreateIntentOptions,
   EscrowLock,
+  SolanaEscrowLock,
   MultichainOrder,
   StandardOrder,
   TokenContext,
+  SolanaStandardOrder,
 } from "../types/index";
 import { MultichainOrderIntent } from "./multichain";
 import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
 import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
+import { SolanaStandardOrderIntent } from "./solanaStandard";
 
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
  */
 export class Intent {
-  private lock: EscrowLock | CompactLock;
+  private lock: EscrowLock | SolanaEscrowLock | CompactLock;
 
   private walletUser: `0x${string}`;
   private inputs: TokenContext[];
@@ -104,10 +107,37 @@ export class Intent {
     ]);
 
     const currentTime = Math.floor(Date.now() / 1000);
+    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
+
+    if (this.lock.type === "solanaEscrow") {
+      const inputOracle = this.getOracle(this.verifier, inputChain)!;
+      const solanaStandardOrder: SolanaStandardOrder = {
+        user: this.walletUser,
+        nonce: this.nonce(),
+        originChainId: inputChain,
+        fillDeadline: currentTime + this.fillDeadline,
+        expires: currentTime + this.expiry,
+        inputOracle,
+        input: {
+          token: firstInput.token.address,
+          amount: firstInput.amount,
+        },
+        outputs: buildMandateOutputs({
+          exclusiveFor: this.exclusiveFor,
+          outputTokens: this.outputs,
+          getOracle: this.getOracle,
+          getSettler: this.getSettler,
+          verifier: this.verifier,
+          sameChain: this.isSameChain(),
+          bytes32Recipient,
+          currentTime,
+        }),
+      };
+      return new SolanaStandardOrderIntent(inputSettlerForLock(this.lock, false), solanaStandardOrder);
+    }
     const inputOracle = this.isSameChain()
       ? COIN_FILLER
       : this.getOracle(this.verifier, inputChain)!;
-    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     
     const order: StandardOrder = {
       user: this.walletUser,
@@ -191,7 +221,7 @@ export class Intent {
     return new MultichainOrderIntent(
       inputSettlerForLock(this.lock, true),
       order,
-      this.lock,
+      this.lock as EscrowLock | CompactLock,
     );
   }
 

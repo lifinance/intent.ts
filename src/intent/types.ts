@@ -1,13 +1,13 @@
-import type { MultichainOrder, StandardOrder } from "../types/index";
+import type { MultichainOrder, SolanaStandardOrder, StandardOrder } from "../types/index";
 
 export interface OrderIntentCommon<
-  TOrder extends StandardOrder | MultichainOrder =
+  TOrder extends StandardOrder | SolanaStandardOrder | MultichainOrder =
     | StandardOrder
+    | SolanaStandardOrder
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;
   asOrder(): TOrder;
   inputChains(): bigint[];
   orderId(): `0x${string}`;
-  compactClaimHash(): `0x${string}`;
 }

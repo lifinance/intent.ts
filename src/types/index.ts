@@ -5,5 +5,4 @@ export * from "./mandate";
 export * from "./order";
 export * from "./quote";
 export * from "./signature";
-export * from "./solana";
 export * from "./token";

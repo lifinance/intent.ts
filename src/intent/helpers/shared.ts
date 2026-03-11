@@ -3,8 +3,9 @@ import {
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  SOLANA_INPUT_SETTLER_ESCROW,
 } from "../../constants";
-import type { CompactLock, EscrowLock } from "../../types";
+import type { CompactLock, EscrowLock, SolanaEscrowLock } from "../../types";
 
 export const ONE_MINUTE = 60;
 export const ONE_HOUR = 60 * ONE_MINUTE;
@@ -15,7 +16,7 @@ export function selectAllBut<T>(arr: T[], index: number): T[] {
 }
 
 export function inputSettlerForLock(
-  lock: EscrowLock | CompactLock,
+  lock: EscrowLock | CompactLock | SolanaEscrowLock,
   multichain: boolean,
 ) {
   if (lock.type === "compact" && multichain === false)
@@ -26,6 +27,8 @@ export function inputSettlerForLock(
     return INPUT_SETTLER_ESCROW_LIFI;
   if (lock.type === "escrow" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_ESCROW;
+  if (lock.type === "solanaEscrow" && multichain === false)
+    return SOLANA_INPUT_SETTLER_ESCROW;
 
   throw new Error(
     `Not supported | multichain: ${multichain}, type: ${lock.type}`,

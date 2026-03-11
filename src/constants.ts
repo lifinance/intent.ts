@@ -15,3 +15,9 @@ export const MULTICHAIN_INPUT_SETTLER_ESCROW =
   "0xb912b4c38ab54b94D45Ac001484dEBcbb519Bc2B" as const;
 export const MULTICHAIN_INPUT_SETTLER_COMPACT =
   "0x1fccC0807F25A58eB531a0B5b4bf3dCE88808Ed7" as const;
+
+
+// Solana config
+export const SOLANA_INPUT_SETTLER_ESCROW =
+  "0x4186c46d62fb033aace3a262def7efbbef0591b8e98732bcd62edbbc0916da57" as const;
+

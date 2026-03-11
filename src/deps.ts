@@ -8,14 +8,6 @@ export type IntentDeps = {
   getSettler?: (chainId: bigint) => `0x${string}` | undefined;
 };
 
-export type SolanaIntentDeps = {
-  inputOracle: `0x${string}`;
-  getOracle: (
-    verifier: CoreVerifier,
-    chainId: bigint,
-  ) => `0x${string}` | undefined;
-};
-
 export type StandardOrderValidationDeps = {
   allowedInputOracles: (
     args: Readonly<{ chainId: bigint; sameChainFill: boolean }>,

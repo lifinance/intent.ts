@@ -1,5 +1,16 @@
-import type { MandateOutput } from "./mandate";
+import type { MandateInput, MandateOutput } from "./mandate";
 import type { NoSignature, Signature } from "./signature";
+
+export type SolanaStandardOrder = {
+  user: `0x${string}`;
+  nonce: bigint;
+  originChainId: bigint;
+  expires: number;
+  fillDeadline: number;
+  inputOracle: `0x${string}`;
+  input: MandateInput;
+  outputs: MandateOutput[];
+};
 
 export type StandardOrder = {
   user: `0x${string}`;
@@ -37,7 +48,7 @@ export type MultichainOrder = {
 
 export type OrderContainer = {
   inputSettler: `0x${string}`;
-  order: StandardOrder | MultichainOrder;
+  order: StandardOrder | SolanaStandardOrder | MultichainOrder;
   sponsorSignature: Signature | NoSignature;
   allocatorSignature: Signature | NoSignature;
 };

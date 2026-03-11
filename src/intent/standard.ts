@@ -3,10 +3,6 @@ import { INPUT_SETTLER_COMPACT_LIFI } from "../constants";
 import { compactClaimHash } from "./compact/claims";
 import { toStandardBatchCompact } from "./compact/conversions";
 import { encodeOutputs } from "./helpers/output-encoding";
-import {
-  computeSolanaStandardOrderId,
-  standardOrderToSolanaOrder,
-} from "./solana";
 import type { BatchCompact, StandardOrder } from "../types/index";
 import type { OrderIntentCommon } from "./types";
 
@@ -63,13 +59,7 @@ export class StandardOrderIntent implements OrderIntentCommon<StandardOrder> {
     return [this.order.originChainId];
   }
 
-  // TODO: For now consider it as solana order (this has to change in the future)
   orderId(): `0x${string}` {
-    if (this.order.user.length === 66) {
-      return computeSolanaStandardOrderId(
-        standardOrderToSolanaOrder(this.order),
-      );
-    }
     return computeStandardOrderId(this.inputSettler, this.order);
   }
 
