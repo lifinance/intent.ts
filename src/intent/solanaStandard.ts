@@ -95,8 +95,10 @@ export function computeSolanaStandardOrderId(
 export function standardOrderToSolanaOrder(
   order: StandardOrder,
 ): SolanaStandardOrder {
-  const [firstInput] = order.inputs;
-  if (!firstInput) throw new Error("No inputs in order");
+  if (order.inputs.length === 0) throw new Error("No inputs in order");
+  if (order.inputs.length > 1)
+    throw new Error("SolanaStandardOrder only supports a single input");
+  const firstInput = order.inputs[0]!;
   const [tokenBigInt, amount] = firstInput;
   return {
     user: order.user,

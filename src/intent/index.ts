@@ -1,6 +1,7 @@
 export { Intent } from "./create";
 export {
   SolanaStandardOrderIntent,
+  borshEncodeSolanaOrder,
   computeSolanaStandardOrderId,
   standardOrderToSolanaOrder,
 } from "./solanaStandard";

@@ -27,7 +27,7 @@ describe("output encoding helpers", () => {
       },
       verifier: "polymer",
       sameChain: false,
-      recipient: "0x1111111111111111111111111111111111111111",
+      recipient: "0x0000000000000000000000001111111111111111111111111111111111111111",
       currentTime: 1_700_000_000,
     });
     const encoded = encodeOutputs(output);

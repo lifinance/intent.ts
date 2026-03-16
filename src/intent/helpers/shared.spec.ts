@@ -29,7 +29,7 @@ describe("intent shared helpers", () => {
   });
 
   it("maps lock type and scope to the expected input settler", () => {
-    const escrowLock: EscrowLock = { type: "escrow" };
+    const escrowLock: EscrowLock = { type: "escrow", chain: "evm" };
     const compactLock: CompactLock = {
       type: "compact",
       resetPeriod: ResetPeriod.OneMinute,

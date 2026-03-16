@@ -14,6 +14,9 @@ export function encodeOutputs(outputs: MandateOutput[]) {
   );
 }
 
+/** 
+ * recipient must be a bytes32-padded address (32 bytes, 0x-prefixed). 
+ */
 export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
@@ -21,7 +24,7 @@ export function buildMandateOutputs(options: {
   getSettler?: IntentDeps["getSettler"];
   verifier: CoreVerifier;
   sameChain: boolean;
-  bytes32Recipient: `0x${string}`;
+  recipient: `0x${string}`;
   currentTime: number;
 }): MandateOutput[] {
   const {
@@ -31,7 +34,7 @@ export function buildMandateOutputs(options: {
     getSettler,
     verifier,
     sameChain,
-    bytes32Recipient,
+    recipient,
     currentTime,
   } = options;
 
@@ -63,7 +66,7 @@ export function buildMandateOutputs(options: {
       chainId: token.chainId,
       token: addressToBytes32(token.address),
       amount: amount,
-      recipient: bytes32Recipient,
+      recipient,
       callbackData: "0x",
       context,
     };

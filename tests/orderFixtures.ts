@@ -3,6 +3,7 @@ import { addressToBytes32 } from "../src/helpers/convert";
 import type {
   MandateOutput,
   MultichainOrder,
+  SolanaStandardOrder,
   StandardOrder,
 } from "../src/types";
 
@@ -48,6 +49,27 @@ export function makeStandardOrder(
     fillDeadline: TEST_NOW_SECONDS + 900,
     inputOracle: TEST_POLYMER_ORACLE,
     inputs: [[1n, 1n]],
+    outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
+    ...overrides,
+  };
+}
+
+export const CHAIN_ID_SOLANA_DEVNET = 1151111081099712n;
+
+export function makeSolanaStandardOrder(
+  overrides: Partial<SolanaStandardOrder> = {},
+): SolanaStandardOrder {
+  return {
+    user: TEST_USER,
+    nonce: 1n,
+    originChainId: CHAIN_ID_SOLANA_DEVNET,
+    expires: TEST_NOW_SECONDS + 1000,
+    fillDeadline: TEST_NOW_SECONDS + 900,
+    inputOracle: TEST_POLYMER_ORACLE,
+    input: {
+      token: b32("a"),
+      amount: 1_000_000n,
+    },
     outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
     ...overrides,
   };

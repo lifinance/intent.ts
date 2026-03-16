@@ -78,7 +78,7 @@ function makeEscrowOptions(
     outputTokens,
     verifier: "polymer",
     account: TEST_USER,
-    lock: { type: "escrow" },
+    lock: { type: "escrow", chain: "evm" },
   };
 }
 
@@ -140,7 +140,7 @@ describe("Intent", () => {
         outputTokens: [ctx(ETH_WETH, 1n)],
         verifier: "polymer",
         account: TEST_USER,
-        lock: { type: "escrow" },
+        lock: { type: "escrow", chain: "evm" },
       },
       intentDeps,
     );

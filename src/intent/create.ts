@@ -5,7 +5,6 @@ import type {
   CompactLock,
   CreateIntentOptions,
   EscrowLock,
-  SolanaEscrowLock,
   MultichainOrder,
   StandardOrder,
   TokenContext,
@@ -23,7 +22,7 @@ import { SolanaStandardOrderIntent } from "./solanaStandard";
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
  */
 export class Intent {
-  private lock: EscrowLock | SolanaEscrowLock | CompactLock;
+  private lock: EscrowLock | CompactLock;
 
   private walletUser: `0x${string}`;
   private inputs: TokenContext[];
@@ -107,9 +106,14 @@ export class Intent {
     ]);
 
     const currentTime = Math.floor(Date.now() / 1000);
-    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
+    // bytes32-padded address used as the mandate output recipient
+    const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    if (this.lock.type === "solanaEscrow") {
+    if (this.lock.chain === "solana") {
+      if (inputs.length > 1) {
+        throw new Error("SolanaStandardOrder only supports a single input");
+      }
+
       const inputOracle = this.getOracle(this.verifier, inputChain)!;
       const solanaStandardOrder: SolanaStandardOrder = {
         user: this.walletUser,
@@ -129,7 +133,7 @@ export class Intent {
           getSettler: this.getSettler,
           verifier: this.verifier,
           sameChain: this.isSameChain(),
-          bytes32Recipient,
+          recipient,
           currentTime,
         }),
       };
@@ -154,7 +158,7 @@ export class Intent {
         getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: this.isSameChain(),
-        bytes32Recipient,
+        recipient,
         currentTime,
       }),
     };
@@ -175,7 +179,7 @@ export class Intent {
       this.verifier,
       firstInput.token.chainId,
     )!;
-    const bytes32Recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
+    const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),
     ].map((chain) => {
@@ -212,7 +216,7 @@ export class Intent {
         getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: false,
-        bytes32Recipient,
+        recipient,
         currentTime,
       }),
       inputs,
