@@ -5,10 +5,17 @@ import {
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  SOLANA_MAINNET_CHAIN_ID,
+  SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
+  SOLANA_TESTNET_CHAIN_ID,
+  SOLANA_TESTNET_INPUT_SETTLER_ESCROW,
+  SOLANA_DEVNET_CHAIN_ID,
+  SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 } from "../../constants";
 import type { CompactLock, EscrowLock } from "../../types";
 import {
   inputSettlerForLock,
+  inputSettlerForSolana,
   ONE_DAY,
   ONE_HOUR,
   ONE_MINUTE,
@@ -29,7 +36,7 @@ describe("intent shared helpers", () => {
   });
 
   it("maps lock type and scope to the expected input settler", () => {
-    const escrowLock: EscrowLock = { type: "escrow", chain: "evm" };
+    const escrowLock: EscrowLock = { type: "escrow" };
     const compactLock: CompactLock = {
       type: "compact",
       resetPeriod: ResetPeriod.OneMinute,
@@ -47,6 +54,24 @@ describe("intent shared helpers", () => {
     );
     expect(inputSettlerForLock(compactLock, true)).toBe(
       MULTICHAIN_INPUT_SETTLER_COMPACT,
+    );
+  });
+
+  it("maps solana chain id to the expected input settler", () => {
+    expect(inputSettlerForSolana(SOLANA_MAINNET_CHAIN_ID)).toBe(
+      SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
+    );
+    expect(inputSettlerForSolana(SOLANA_TESTNET_CHAIN_ID)).toBe(
+      SOLANA_TESTNET_INPUT_SETTLER_ESCROW,
+    );
+    expect(inputSettlerForSolana(SOLANA_DEVNET_CHAIN_ID)).toBe(
+      SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+    );
+  });
+
+  it("throws for unsupported solana chain id", () => {
+    expect(() => inputSettlerForSolana(999n)).toThrow(
+      "Unsupported Solana chain id",
     );
   });
 });

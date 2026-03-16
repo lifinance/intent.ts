@@ -48,10 +48,9 @@ function inferLock(inputSettler: `0x${string}`): EscrowLock | CompactLock {
       type: "compact",
       resetPeriod: ResetPeriod.OneDay,
       allocatorId: "0",
-      chain: "evm" as const,
     };
   }
-  return { type: "escrow", chain: "evm" as const };
+  return { type: "escrow" };
 }
 
 export function isStandardOrder(order: OrderLike): order is StandardOrder {

@@ -15,7 +15,6 @@ export function tokenIdToLock(tokenId: bigint, amount: bigint): Lock {
     lockTag: `0x${bytes32.slice(0, 12 * 2)}`,
     token: `0x${bytes32.slice(12 * 2, 32 * 2)}`,
     amount,
-    chain: "evm" as const,
   };
 }
 

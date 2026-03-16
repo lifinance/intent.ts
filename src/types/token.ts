@@ -3,6 +3,8 @@ export type CoreToken = {
   name: string;
   chainId: bigint;
   decimals: number;
+  // CAIP namespace
+  chain:string;
 };
 
 export type TokenContext = {

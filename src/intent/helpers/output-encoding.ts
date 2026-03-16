@@ -1,5 +1,5 @@
 import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
-import { COIN_FILLER } from "../../constants";
+import { COIN_FILLER, solanaOutputSettlersPDAs } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
@@ -21,7 +21,6 @@ export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
   getOracle: IntentDeps["getOracle"];
-  getSettler?: IntentDeps["getSettler"];
   verifier: CoreVerifier;
   sameChain: boolean;
   recipient: `0x${string}`;
@@ -31,7 +30,6 @@ export function buildMandateOutputs(options: {
     exclusiveFor,
     outputTokens,
     getOracle,
-    getSettler,
     verifier,
     sameChain,
     recipient,
@@ -56,7 +54,9 @@ export function buildMandateOutputs(options: {
   }
 
   return outputTokens.map(({ token, amount }) => {
-    const outputSettler = getSettler?.(token.chainId) ?? COIN_FILLER;
+    const outputSettler = token.chain === "solana"
+      ? solanaOutputSettlersPDAs[token.chainId.toString()]!
+      : COIN_FILLER;
     const outputOracle = sameChain
       ? addressToBytes32(outputSettler)
       : addressToBytes32(getOracle(verifier, token.chainId)!);

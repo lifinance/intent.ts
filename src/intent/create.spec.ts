@@ -41,6 +41,7 @@ const ETH_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_ETHEREUM,
   decimals: 6,
+  chain: "eip155",
 };
 
 const ETH_WETH: CoreToken = {
@@ -48,6 +49,7 @@ const ETH_WETH: CoreToken = {
   name: "weth",
   chainId: CHAIN_ID_ETHEREUM,
   decimals: 18,
+  chain: "eip155",
 };
 
 const ARB_USDC: CoreToken = {
@@ -55,6 +57,7 @@ const ARB_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_ARBITRUM,
   decimals: 6,
+  chain: "eip155",
 };
 
 const BASE_USDC: CoreToken = {
@@ -62,6 +65,7 @@ const BASE_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_BASE,
   decimals: 6,
+  chain: "eip155",
 };
 
 function ctx(token: CoreToken, amount: bigint): TokenContext {
@@ -78,7 +82,7 @@ function makeEscrowOptions(
     outputTokens,
     verifier: "polymer",
     account: TEST_USER,
-    lock: { type: "escrow", chain: "evm" },
+    lock: { type: "escrow" },
   };
 }
 
@@ -140,7 +144,7 @@ describe("Intent", () => {
         outputTokens: [ctx(ETH_WETH, 1n)],
         verifier: "polymer",
         account: TEST_USER,
-        lock: { type: "escrow", chain: "evm" },
+        lock: { type: "escrow" },
       },
       intentDeps,
     );

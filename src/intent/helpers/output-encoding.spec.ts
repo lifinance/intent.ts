@@ -12,6 +12,7 @@ const outputTokens: TokenContext[] = [
       name: "USDC",
       chainId: 42161n,
       decimals: 6,
+      chain: "eip155",
     },
     amount: 1_000_000n,
   },

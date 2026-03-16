@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { numberToHex } from "viem";
-import { SOLANA_INPUT_SETTLER_ESCROW } from "../constants";
+import { SOLANA_DEVNET_INPUT_SETTLER_ESCROW } from "../constants";
 import {
   borshEncodeSolanaOrder,
   computeSolanaStandardOrderId,
@@ -182,7 +182,7 @@ describe("solana standard intent", () => {
     it("returns the original order from asOrder", () => {
       const order = makeSolanaStandardOrder();
       const intent = new SolanaStandardOrderIntent(
-        SOLANA_INPUT_SETTLER_ESCROW,
+        SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
         order,
       );
 
@@ -192,7 +192,7 @@ describe("solana standard intent", () => {
     it("returns the origin chain as the only input chain", () => {
       const order = makeSolanaStandardOrder();
       const intent = new SolanaStandardOrderIntent(
-        SOLANA_INPUT_SETTLER_ESCROW,
+        SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
         order,
       );
 
@@ -202,7 +202,7 @@ describe("solana standard intent", () => {
     it("computes a deterministic orderId from its current state", () => {
       const order = makeSolanaStandardOrder();
       const intent = new SolanaStandardOrderIntent(
-        SOLANA_INPUT_SETTLER_ESCROW,
+        SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
         order,
       );
       const id1 = intent.orderId();
@@ -219,11 +219,11 @@ describe("solana standard intent", () => {
         outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM, 999n)],
       });
       const intent1 = new SolanaStandardOrderIntent(
-        SOLANA_INPUT_SETTLER_ESCROW,
+        SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
         order1,
       );
       const intent2 = new SolanaStandardOrderIntent(
-        SOLANA_INPUT_SETTLER_ESCROW,
+        SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
         order2,
       );
 

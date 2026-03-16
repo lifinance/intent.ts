@@ -10,4 +10,5 @@ export interface OrderIntentCommon<
   asOrder(): TOrder;
   inputChains(): bigint[];
   orderId(): `0x${string}`;
+  compactClaimHash?(): `0x${string}`;
 }

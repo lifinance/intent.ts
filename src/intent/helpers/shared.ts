@@ -3,7 +3,7 @@ import {
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
-  SOLANA_INPUT_SETTLER_ESCROW,
+  SOLANA_INPUT_SETTLER_PROGRAMS
 } from "../../constants";
 import type { CompactLock, EscrowLock } from "../../types";
 
@@ -13,6 +13,14 @@ export const ONE_DAY = 24 * ONE_HOUR;
 
 export function selectAllBut<T>(arr: T[], index: number): T[] {
   return [...arr.slice(0, index), ...arr.slice(index + 1, arr.length)];
+}
+
+
+
+export function inputSettlerForSolana(chainId: bigint): `0x${string}` {
+  const settler = SOLANA_INPUT_SETTLER_PROGRAMS[chainId.toString()];
+  if (!settler) throw new Error(`Unsupported Solana chain id: ${chainId}`);
+  return settler;
 }
 
 export function inputSettlerForLock(
@@ -25,12 +33,10 @@ export function inputSettlerForLock(
     return MULTICHAIN_INPUT_SETTLER_COMPACT;
   if (lock.type === "escrow" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_ESCROW;
-  if (lock.type === "escrow" && lock.chain == "evm" && multichain === false)
+  if (lock.type === "escrow" && multichain === false)
     return INPUT_SETTLER_ESCROW_LIFI;
-  if (lock.type === "escrow" && lock.chain == "solana" && multichain === false)
-    return SOLANA_INPUT_SETTLER_ESCROW;
 
   throw new Error(
-    `Not supported | multichain: ${multichain}, type: ${lock.type}, chain: ${lock.chain}`,
+    `Not supported | multichain: ${multichain}, type: ${lock.type}`,
   );
 }

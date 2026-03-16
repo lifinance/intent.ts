@@ -38,7 +38,7 @@ describe("intent core split", () => {
 
     expect(intent).toBeInstanceOf(MultichainOrderIntent);
     expect(intent.inputChains().length).toBe(2);
-    expect(intent.lock).toEqual({ type: "escrow", chain: "evm" });
+    expect(intent.lock).toEqual({ type: "escrow" });
     const orderId = intent.orderId();
     expect(orderId.startsWith("0x")).toBe(true);
     expect(orderId.length).toBe(66);
@@ -54,7 +54,6 @@ describe("intent core split", () => {
       type: "compact",
       resetPeriod: ResetPeriod.OneDay,
       allocatorId: "0",
-      chain: "evm",
     });
   });
 

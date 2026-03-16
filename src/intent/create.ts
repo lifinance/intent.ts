@@ -13,7 +13,7 @@ import type {
 import { MultichainOrderIntent } from "./multichain";
 import { StandardOrderIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
-import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
+import { ONE_DAY, ONE_HOUR, inputSettlerForLock, inputSettlerForSolana } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
 import { SolanaStandardOrderIntent } from "./solanaStandard";
 
@@ -28,7 +28,6 @@ export class Intent {
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
-  private getSettler: IntentDeps["getSettler"];
   private verifier: string;
   private exclusiveFor?: `0x${string}`;
   private outputRecipient?: `0x${string}`;
@@ -44,7 +43,6 @@ export class Intent {
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
     this.getOracle = deps.getOracle;
-    this.getSettler = deps.getSettler;
     this.exclusiveFor = opts.exclusiveFor;
     this.outputRecipient = opts.outputRecipient;
   }
@@ -109,7 +107,7 @@ export class Intent {
     // bytes32-padded address used as the mandate output recipient
     const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    if (this.lock.chain === "solana") {
+    if (firstInput.token.chain === "solana") {
       if (inputs.length > 1) {
         throw new Error("SolanaStandardOrder only supports a single input");
       }
@@ -130,14 +128,13 @@ export class Intent {
           exclusiveFor: this.exclusiveFor,
           outputTokens: this.outputs,
           getOracle: this.getOracle,
-          getSettler: this.getSettler,
           verifier: this.verifier,
           sameChain: this.isSameChain(),
           recipient,
           currentTime,
         }),
       };
-      return new SolanaStandardOrderIntent(inputSettlerForLock(this.lock, false), solanaStandardOrder);
+      return new SolanaStandardOrderIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
     }
     const inputOracle = this.isSameChain()
       ? COIN_FILLER
@@ -155,7 +152,6 @@ export class Intent {
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
         getOracle: this.getOracle,
-        getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: this.isSameChain(),
         recipient,
@@ -213,7 +209,6 @@ export class Intent {
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
         getOracle: this.getOracle,
-        getSettler: this.getSettler,
         verifier: this.verifier,
         sameChain: false,
         recipient,

@@ -18,6 +18,36 @@ export const MULTICHAIN_INPUT_SETTLER_COMPACT =
 
 
 // Solana config
-export const SOLANA_INPUT_SETTLER_ESCROW =
+
+export const SOLANA_MAINNET_CHAIN_ID = 1151111081099710n;
+export const SOLANA_TESTNET_CHAIN_ID = 1151111081099711n;
+export const SOLANA_DEVNET_CHAIN_ID = 1151111081099712n;
+
+//TODO: fill in mainnet and testnet input settler programs
+export const SOLANA_MAINNET_INPUT_SETTLER_ESCROW =
+  "0x" as const;
+export const SOLANA_TESTNET_INPUT_SETTLER_ESCROW =
+  "0x" as const;
+export const SOLANA_DEVNET_INPUT_SETTLER_ESCROW =
   "0x4186c46d62fb033aace3a262def7efbbef0591b8e98732bcd62edbbc0916da57" as const;
 
+export const SOLANA_INPUT_SETTLER_PROGRAMS: Record<string, `0x${string}`> = {
+    [SOLANA_MAINNET_CHAIN_ID.toString()]: SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
+    [SOLANA_TESTNET_CHAIN_ID.toString()]: SOLANA_TESTNET_INPUT_SETTLER_ESCROW,
+    [SOLANA_DEVNET_CHAIN_ID.toString()]: SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+  };
+
+//TODO: fill in mainnet and testnet output settler PDAs
+export const SOLANA_MAINNET_OUTPUT_SETTLER_PDA =
+  "0x" as const;
+export const SOLANA_TESTNET_OUTPUT_SETTLER_PDA =
+  "0x" as const;
+export const SOLANA_DEVNET_OUTPUT_SETTLER_PDA =
+  "0xabb04f05c412a4892f8c93efa4eda9f360ba8b5c8342bed51207c7a4fdd036d6" as const;
+
+
+export const solanaOutputSettlersPDAs: Record<string, `0x${string}`> = {
+  [SOLANA_MAINNET_CHAIN_ID.toString()]: SOLANA_MAINNET_OUTPUT_SETTLER_PDA,
+  [SOLANA_TESTNET_CHAIN_ID.toString()]: SOLANA_TESTNET_OUTPUT_SETTLER_PDA,
+  [SOLANA_DEVNET_CHAIN_ID.toString()]: SOLANA_DEVNET_OUTPUT_SETTLER_PDA,
+};
