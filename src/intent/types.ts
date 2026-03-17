@@ -12,3 +12,30 @@ export interface OrderIntentCommon<
   orderId(): `0x${string}`;
   compactClaimHash?(): `0x${string}`;
 }
+
+
+// export interface BaseOrderIntent<
+//   TOrder extends StandardOrder | SolanaStandardOrder | MultichainOrder =
+//     | StandardOrder
+//     | SolanaStandardOrder
+//     | MultichainOrder,
+// > {
+//   inputSettler: `0x${string}`;
+//   asOrder(): TOrder;
+//   orderId(): `0x${string}`;
+// }
+
+// export interface EvmOrderIntent<
+//   TOrder extends StandardOrder | MultichainOrder =
+//     | StandardOrder
+//     | MultichainOrder,
+// > extends BaseOrderIntent<TOrder> {
+//   compactClaimHash(): `0x${string}`;
+//   inputChains(): bigint[];
+// }
+
+// export interface SolanaOrderIntent<
+//   TOrder extends SolanaStandardOrder = SolanaStandardOrder,
+// > extends BaseOrderIntent<TOrder> {
+//   inputChain(): MandateInput;
+// }
