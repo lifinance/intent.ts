@@ -17,7 +17,6 @@ import { ONE_DAY, ONE_HOUR, inputSettlerForLock, inputSettlerForSolana } from ".
 import { addressToBytes32 } from "../helpers/convert";
 import { SolanaStandardOrderIntent } from "./solanaStandard";
 
-
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
  */
@@ -107,62 +106,56 @@ export class Intent {
     // bytes32-padded address used as the mandate output recipient
     const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    if (firstInput.token.chain === "solana") {
-      if (inputs.length > 1) {
-        throw new Error("SolanaStandardOrder only supports a single input");
+    switch (firstInput.token.chain) {
+      case "solana": {
+        if (inputs.length > 1) {
+          throw new Error("SolanaStandardOrder only supports a single input");
+        }
+        const solanaStandardOrder: SolanaStandardOrder = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: this.getOracle(this.verifier, inputChain)!,
+          input: {
+            token: firstInput.token.address,
+            amount: firstInput.amount,
+          },
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            sameChain: this.isSameChain(),
+            recipient,
+            currentTime,
+          }),
+        };
+        return new SolanaStandardOrderIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
       }
-
-      const inputOracle = this.getOracle(this.verifier, inputChain)!;
-      const solanaStandardOrder: SolanaStandardOrder = {
-        user: this.walletUser,
-        nonce: this.nonce(),
-        originChainId: inputChain,
-        fillDeadline: currentTime + this.fillDeadline,
-        expires: currentTime + this.expiry,
-        inputOracle,
-        input: {
-          token: firstInput.token.address,
-          amount: firstInput.amount,
-        },
-        outputs: buildMandateOutputs({
-          exclusiveFor: this.exclusiveFor,
-          outputTokens: this.outputs,
-          getOracle: this.getOracle,
-          verifier: this.verifier,
-          sameChain: this.isSameChain(),
-          recipient,
-          currentTime,
-        }),
-      };
-      return new SolanaStandardOrderIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
+      default: {
+        const order: StandardOrder = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: this.isSameChain() ? COIN_FILLER : this.getOracle(this.verifier, inputChain)!,
+          inputs,
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            sameChain: this.isSameChain(),
+            recipient,
+            currentTime,
+          }),
+        };
+        return new StandardOrderIntent(inputSettlerForLock(this.lock, false), order);
+      }
     }
-    const inputOracle = this.isSameChain()
-      ? COIN_FILLER
-      : this.getOracle(this.verifier, inputChain)!;
-    
-    const order: StandardOrder = {
-      user: this.walletUser,
-      nonce: this.nonce(),
-      originChainId: inputChain,
-      fillDeadline: currentTime + this.fillDeadline,
-      expires: currentTime + this.expiry,
-      inputOracle,
-      inputs,
-      outputs: buildMandateOutputs({
-        exclusiveFor: this.exclusiveFor,
-        outputTokens: this.outputs,
-        getOracle: this.getOracle,
-        verifier: this.verifier,
-        sameChain: this.isSameChain(),
-        recipient,
-        currentTime,
-      }),
-    };
-
-    return new StandardOrderIntent(
-      inputSettlerForLock(this.lock, false),
-      order,
-    );
   }
 
   multichain() {
@@ -197,7 +190,6 @@ export class Intent {
         ]),
       };
     });
-
 
     const order: MultichainOrder = {
       user: this.walletUser,

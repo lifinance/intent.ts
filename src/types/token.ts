@@ -4,7 +4,7 @@ export type CoreToken = {
   chainId: bigint;
   decimals: number;
   // CAIP namespace
-  chain:string;
+  chain: "eip155" | "solana";
 };
 
 export type TokenContext = {

@@ -5,7 +5,7 @@ import type {
   SolanaStandardOrder,
   StandardOrder,
 } from "../types/index";
-import type { OrderIntentCommon } from "./types";
+import type { SolanaOrderIntent } from "./types";
 
 // -- Borsh schemas ---------------------------------------------------------- //
 // Mirrors `common::types::StandardOrder` in catalyst-intent-svm.
@@ -25,6 +25,8 @@ const mandateOutputSchema = {
   },
 };
 
+// Input amount is u64 (not bytes32 like outputs) because the Solana program
+// stores SPL token amounts as u64, which covers the full u64 max supply.
 const mandateInputSchema = {
   struct: {
     token: bytes32,
@@ -118,9 +120,7 @@ export function standardOrderToSolanaOrder(
 
 // -- Intent class ----------------------------------------------------------- //
 
-export class SolanaStandardOrderIntent
-  implements OrderIntentCommon<SolanaStandardOrder>
-{
+export class SolanaStandardOrderIntent implements SolanaOrderIntent {
   inputSettler: `0x${string}`;
   private readonly order: SolanaStandardOrder;
 
@@ -133,8 +133,12 @@ export class SolanaStandardOrderIntent
     return this.order;
   }
 
-  inputChains(): bigint[] {
-    return [this.order.originChainId];
+  inputChain(): bigint {
+    return this.order.originChainId;
+  }
+
+  borshEncode(): Uint8Array {
+    return borshEncodeSolanaOrder(this.order);
   }
 
   orderId(): `0x${string}` {

@@ -55,7 +55,7 @@ export function buildMandateOutputs(options: {
 
   return outputTokens.map(({ token, amount }) => {
     const outputSettler = token.chain === "solana"
-      ? solanaOutputSettlersPDAs[token.chainId.toString()]!
+      ? solanaOutputSettlersPDAs[token.chainId.toString()] ?? (() => { throw new Error(`Unsupported Solana chain id: ${token.chainId}`); })()
       : COIN_FILLER;
     const outputOracle = sameChain
       ? addressToBytes32(outputSettler)

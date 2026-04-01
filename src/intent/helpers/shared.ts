@@ -15,8 +15,6 @@ export function selectAllBut<T>(arr: T[], index: number): T[] {
   return [...arr.slice(0, index), ...arr.slice(index + 1, arr.length)];
 }
 
-
-
 export function inputSettlerForSolana(chainId: bigint): `0x${string}` {
   const settler = SOLANA_INPUT_SETTLER_PROGRAMS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Solana chain id: ${chainId}`);
@@ -29,12 +27,12 @@ export function inputSettlerForLock(
 ) {
   if (lock.type === "compact" && multichain === false)
     return INPUT_SETTLER_COMPACT_LIFI;
+  if (lock.type === "escrow" && multichain === false)
+    return INPUT_SETTLER_ESCROW_LIFI;
   if (lock.type === "compact" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_COMPACT;
   if (lock.type === "escrow" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_ESCROW;
-  if (lock.type === "escrow" && multichain === false)
-    return INPUT_SETTLER_ESCROW_LIFI;
 
   throw new Error(
     `Not supported | multichain: ${multichain}, type: ${lock.type}`,

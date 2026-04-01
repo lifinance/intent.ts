@@ -8,7 +8,19 @@ export interface OrderIntentCommon<
 > {
   inputSettler: `0x${string}`;
   asOrder(): TOrder;
-  inputChains(): bigint[];
   orderId(): `0x${string}`;
-  compactClaimHash?(): `0x${string}`;
+}
+
+export interface EvmOrderIntent<
+  TOrder extends StandardOrder | MultichainOrder =
+    | StandardOrder
+    | MultichainOrder,
+> extends OrderIntentCommon<TOrder> {
+  compactClaimHash(): `0x${string}`;
+  inputChains(): bigint[];
+}
+
+export interface SolanaOrderIntent extends OrderIntentCommon<SolanaStandardOrder> {
+  borshEncode(): Uint8Array;
+  inputChain(): bigint;
 }
