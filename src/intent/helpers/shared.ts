@@ -26,11 +26,11 @@ export function inputSettlerForLock(
   multichain: boolean,
 ) {
   if (lock.type === "compact" && multichain === false)
-        return INPUT_SETTLER_ESCROW_LIFI;
-  if (lock.type === "compact" && multichain === true)
     return INPUT_SETTLER_COMPACT_LIFI;
-  if (lock.type === "escrow" && multichain === false)
+  if (lock.type === "compact" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_COMPACT;
+  if (lock.type === "escrow" && multichain === false)
+    return INPUT_SETTLER_ESCROW_LIFI;
   if (lock.type === "escrow" && multichain === true)
     return MULTICHAIN_INPUT_SETTLER_ESCROW;
 
