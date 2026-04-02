@@ -6,7 +6,7 @@ import type {
   Lock,
   MultichainCompact,
   MultichainOrder,
-  StandardOrder,
+  StandardEVM,
 } from "../../types";
 
 export function tokenIdToLock(tokenId: bigint, amount: bigint): Lock {
@@ -23,7 +23,7 @@ export function inputsToLocks(inputs: [bigint, bigint][]): Lock[] {
 }
 
 export function toStandardBatchCompact(
-  order: StandardOrder,
+  order: StandardEVM,
   arbiter: `0x${string}`,
 ): BatchCompact {
   const mandate: CompactMandate = {

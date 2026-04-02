@@ -1,9 +1,9 @@
-import type { MultichainOrder, SolanaStandardOrder, StandardOrder } from "../types/index";
+import type { MultichainOrder, StandardSolana, StandardEVM } from "../types/index";
 
 export interface OrderIntentCommon<
-  TOrder extends StandardOrder | SolanaStandardOrder | MultichainOrder =
-    | StandardOrder
-    | SolanaStandardOrder
+  TOrder extends StandardEVM | StandardSolana | MultichainOrder =
+    | StandardEVM
+    | StandardSolana
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;
@@ -12,15 +12,15 @@ export interface OrderIntentCommon<
 }
 
 export interface EvmOrderIntent<
-  TOrder extends StandardOrder | MultichainOrder =
-    | StandardOrder
+  TOrder extends StandardEVM | MultichainOrder =
+    | StandardEVM
     | MultichainOrder,
 > extends OrderIntentCommon<TOrder> {
   compactClaimHash(): `0x${string}`;
   inputChains(): bigint[];
 }
 
-export interface SolanaOrderIntent extends OrderIntentCommon<SolanaStandardOrder> {
+export interface SolanaOrderIntent extends OrderIntentCommon<StandardSolana> {
   borshEncode(): Uint8Array;
   inputChain(): bigint;
 }

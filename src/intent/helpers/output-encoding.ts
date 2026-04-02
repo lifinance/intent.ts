@@ -1,5 +1,5 @@
 import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
-import { COIN_FILLER, solanaOutputSettlersPDAs } from "../../constants";
+import { COIN_FILLER, SOLANA_OUTPUT_SETTLER_PDAS } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
@@ -54,12 +54,22 @@ export function buildMandateOutputs(options: {
   }
 
   return outputTokens.map(({ token, amount }) => {
-    const outputSettler = token.chain === "solana"
-      ? solanaOutputSettlersPDAs[token.chainId.toString()] ?? (() => { throw new Error(`Unsupported Solana chain id: ${token.chainId}`); })()
-      : COIN_FILLER;
-    const outputOracle = sameChain
-      ? addressToBytes32(outputSettler)
-      : addressToBytes32(getOracle(verifier, token.chainId)!);
+    const solanaSettler = token.chainNameSpace === "solana"
+      ? SOLANA_OUTPUT_SETTLER_PDAS[token.chainId.toString()]
+      : undefined;
+    if (token.chainNameSpace === "solana" && !solanaSettler)
+      throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
+    
+    const outputSettler = solanaSettler ?? COIN_FILLER;
+    let outputOracle: `0x${string}`;
+    if (sameChain) {
+      outputOracle = addressToBytes32(outputSettler);
+    } else {
+      const oracle = getOracle(verifier, token.chainId);
+      if (!oracle)
+        throw new Error(`No oracle configured for verifier "${verifier}" on chain ${token.chainId}`);
+      outputOracle = addressToBytes32(oracle);
+    }
     return {
       oracle: outputOracle,
       settler: addressToBytes32(outputSettler),

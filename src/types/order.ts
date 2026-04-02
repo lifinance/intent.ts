@@ -1,18 +1,7 @@
-import type { MandateInput, MandateOutput } from "./mandate";
+import type { MandateOutput } from "./mandate";
 import type { NoSignature, Signature } from "./signature";
 
-export type SolanaStandardOrder = {
-  user: `0x${string}`;
-  nonce: bigint;
-  originChainId: bigint;
-  expires: number;
-  fillDeadline: number;
-  inputOracle: `0x${string}`;
-  input: MandateInput;
-  outputs: MandateOutput[];
-};
-
-export type StandardOrder = {
+export type StandardEVM = {
   user: `0x${string}`;
   nonce: bigint;
   originChainId: bigint;
@@ -22,6 +11,19 @@ export type StandardOrder = {
   inputs: [bigint, bigint][];
   outputs: MandateOutput[];
 };
+
+export type StandardSolana = {
+  user: `0x${string}`;
+  nonce: bigint;
+  originChainId: bigint;
+  expires: number;
+  fillDeadline: number;
+  inputOracle: `0x${string}`;
+  inputs: [[bigint, bigint]];
+  outputs: MandateOutput[];
+};
+
+export type StandardOrder = StandardEVM | StandardSolana;
 
 export type MultichainOrderComponent = {
   user: `0x${string}`;
@@ -48,7 +50,7 @@ export type MultichainOrder = {
 
 export type OrderContainer = {
   inputSettler: `0x${string}`;
-  order: StandardOrder | SolanaStandardOrder | MultichainOrder;
+  order: StandardOrder | MultichainOrder;
   sponsorSignature: Signature | NoSignature;
   allocatorSignature: Signature | NoSignature;
 };

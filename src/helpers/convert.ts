@@ -21,8 +21,8 @@ export function toBigIntWithDecimals(value: number, decimals: number): bigint {
 }
 
 export function addressToBytes32(address: `0x${string}`): `0x${string}` {
-  if (address.length === 66 ) return address;
-  // Accept only EVM addresses here.
+  if (address.length === 66) return address;
+  // Accept a 42-char EVM address or an already-padded 66-char bytes32 value.
   if (address.length !== 42) {
     throw new Error(`Invalid address length: ${address.length}`);
   }

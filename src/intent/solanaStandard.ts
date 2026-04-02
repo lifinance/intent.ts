@@ -2,7 +2,7 @@ import { hexToBytes, keccak256, numberToHex, pad } from "viem";
 import { serialize } from "borsh";
 import type {
   MandateOutput,
-  SolanaStandardOrder,
+  StandardSolana,
   StandardOrder,
 } from "../types/index";
 import type { SolanaOrderIntent } from "./types";
@@ -49,7 +49,7 @@ const standardOrderSchema = {
 
 // -- Helpers ---------------------------------------------------------------- //
 
-// Ensure the 32-bytes
+// Pad a hex value to 32 bytes for Borsh encoding.
 const toBytes32 = (hex: `0x${string}`) => hexToBytes(pad(hex, { size: 32 }));
 const bigintToBytes32 = (value: bigint) => hexToBytes(numberToHex(value, { size: 32 }));
 
@@ -68,40 +68,53 @@ function toBorshOutput(o: MandateOutput) {
 
 // -- Public API ------------------------------------------------------------- //
 
+const U32_MAX = 4_294_967_295;
+
 export function borshEncodeSolanaOrder(
-  order: SolanaStandardOrder,
+  order: StandardSolana,
 ): Uint8Array {
+  if (order.expires > U32_MAX)
+    throw new Error(`expires exceeds u32 max: ${order.expires}`);
+  if (order.fillDeadline > U32_MAX)
+    throw new Error(`fillDeadline exceeds u32 max: ${order.fillDeadline}`);
+
+  const [tokenBigInt, inputAmount] = order.inputs[0];
+
   return serialize(standardOrderSchema, {
     user: toBytes32(order.user),
     nonce: BigInt(order.nonce),
     origin_chain_id: BigInt(order.originChainId),
-    expires: Number(order.expires),
-    fill_deadline: Number(order.fillDeadline),
+    expires: order.expires,
+    fill_deadline: order.fillDeadline,
     input_oracle: toBytes32(order.inputOracle),
     input: {
-      token: toBytes32(order.input.token),
-      amount: BigInt(order.input.amount),
+      token: bigintToBytes32(tokenBigInt),
+      amount: BigInt(inputAmount),
     },
     outputs: order.outputs.map(toBorshOutput),
   });
 }
 
-export function computeSolanaStandardOrderId(
-  order: SolanaStandardOrder,
+export function computeStandardSolanaId(
+  order: StandardSolana,
 ): `0x${string}` {
   return keccak256(borshEncodeSolanaOrder(order));
 }
 
 // -- Conversion helpers ----------------------------------------------------- //
 
+/**
+ * Converts a `StandardOrder` with a single input into a `StandardSolana`.
+ * Use this when the order was constructed via the EVM path but needs to be
+ * submitted to the Solana input settler (e.g. for cross-chain reconstruction).
+ * Throws if the order contains zero or more than one input.
+ */
 export function standardOrderToSolanaOrder(
   order: StandardOrder,
-): SolanaStandardOrder {
+): StandardSolana {
   if (order.inputs.length === 0) throw new Error("No inputs in order");
   if (order.inputs.length > 1)
-    throw new Error("SolanaStandardOrder only supports a single input");
-  const firstInput = order.inputs[0]!;
-  const [tokenBigInt, amount] = firstInput;
+    throw new Error("StandardSolana only supports a single input");
   return {
     user: order.user,
     nonce: order.nonce,
@@ -109,10 +122,7 @@ export function standardOrderToSolanaOrder(
     expires: order.expires,
     fillDeadline: order.fillDeadline,
     inputOracle: order.inputOracle,
-    input: {
-      token: numberToHex(tokenBigInt, { size: 32 }),
-      amount,
-    },
+    inputs: [order.inputs[0]!],
     outputs: order.outputs,
   };
 }
@@ -120,16 +130,16 @@ export function standardOrderToSolanaOrder(
 
 // -- Intent class ----------------------------------------------------------- //
 
-export class SolanaStandardOrderIntent implements SolanaOrderIntent {
+export class StandardSolanaIntent implements SolanaOrderIntent {
   inputSettler: `0x${string}`;
-  private readonly order: SolanaStandardOrder;
+  private readonly order: StandardSolana;
 
-  constructor(inputSettler: `0x${string}`, order: SolanaStandardOrder) {
+  constructor(inputSettler: `0x${string}`, order: StandardSolana) {
     this.inputSettler = inputSettler;
     this.order = order;
   }
 
-  asOrder(): SolanaStandardOrder {
+  asOrder(): StandardSolana {
     return this.order;
   }
 
@@ -142,6 +152,6 @@ export class SolanaStandardOrderIntent implements SolanaOrderIntent {
   }
 
   orderId(): `0x${string}` {
-    return computeSolanaStandardOrderId(this.order);
+    return computeStandardSolanaId(this.order);
   }
 }

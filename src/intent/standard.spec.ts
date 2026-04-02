@@ -5,7 +5,7 @@ import {
 } from "../constants";
 import { compactClaimHash as computeCompactClaimHash } from "./compact/claims";
 import { toStandardBatchCompact } from "./compact/conversions";
-import { computeStandardOrderId, StandardOrderIntent } from "./standard";
+import { computeStandardEVMId, StandardEVMIntent } from "./standard";
 import { makeStandardOrder } from "../../tests/orderFixtures";
 import type { StandardOrder } from "../types";
 
@@ -15,11 +15,11 @@ function expectBytes32Hex(value: `0x${string}`) {
 }
 
 describe("standard intent", () => {
-  describe("computeStandardOrderId", () => {
+  describe("computeStandardEVMId", () => {
     it("is deterministic for identical inputs", () => {
       const order = makeStandardOrder();
-      const id1 = computeStandardOrderId(INPUT_SETTLER_ESCROW_LIFI, order);
-      const id2 = computeStandardOrderId(INPUT_SETTLER_ESCROW_LIFI, order);
+      const id1 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
+      const id2 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(id1).toBe(id2);
       expectBytes32Hex(id1);
@@ -27,8 +27,8 @@ describe("standard intent", () => {
 
     it("changes when inputSettler changes", () => {
       const order = makeStandardOrder();
-      const id1 = computeStandardOrderId(INPUT_SETTLER_ESCROW_LIFI, order);
-      const id2 = computeStandardOrderId(INPUT_SETTLER_COMPACT_LIFI, order);
+      const id1 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
+      const id2 = computeStandardEVMId(INPUT_SETTLER_COMPACT_LIFI, order);
 
       expect(id1).not.toBe(id2);
     });
@@ -39,7 +39,7 @@ describe("standard intent", () => {
       const [firstOutput] = baseOrder.outputs;
       if (!firstInput || !firstOutput)
         throw new Error("Expected standard order inputs and outputs");
-      const baseId = computeStandardOrderId(
+      const baseId = computeStandardEVMId(
         INPUT_SETTLER_ESCROW_LIFI,
         baseOrder,
       );
@@ -108,7 +108,7 @@ describe("standard intent", () => {
 
       for (const mutation of mutations) {
         const mutatedOrder = mutation.mutate(baseOrder);
-        const mutatedId = computeStandardOrderId(
+        const mutatedId = computeStandardEVMId(
           INPUT_SETTLER_ESCROW_LIFI,
           mutatedOrder,
         );
@@ -117,37 +117,37 @@ describe("standard intent", () => {
     });
   });
 
-  describe("StandardOrderIntent", () => {
+  describe("StandardEVMIntent", () => {
     it("returns the original order from asOrder", () => {
       const order = makeStandardOrder();
-      const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
+      const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(intent.asOrder()).toBe(order);
     });
 
     it("returns the origin chain as the only input chain", () => {
       const order = makeStandardOrder();
-      const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
+      const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(intent.inputChains()).toEqual([order.originChainId]);
     });
 
     it("computes a deterministic orderId from its current state", () => {
       const order = makeStandardOrder();
-      const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
+      const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const id1 = intent.orderId();
       const id2 = intent.orderId();
 
       expect(id1).toBe(id2);
       expect(id1).toBe(
-        computeStandardOrderId(INPUT_SETTLER_ESCROW_LIFI, order),
+        computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order),
       );
       expectBytes32Hex(id1);
     });
 
     it("asBatchCompact maps order fields and uses compact arbiter constant", () => {
       const order = makeStandardOrder();
-      const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
+      const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const batch = intent.asBatchCompact();
       const expected = toStandardBatchCompact(
         order,
@@ -160,7 +160,7 @@ describe("standard intent", () => {
 
     it("compactClaimHash matches claim hash of asBatchCompact and is deterministic", () => {
       const order = makeStandardOrder();
-      const intent = new StandardOrderIntent(INPUT_SETTLER_ESCROW_LIFI, order);
+      const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const claimHash1 = intent.compactClaimHash();
       const claimHash2 = intent.compactClaimHash();
       const expected = computeCompactClaimHash(intent.asBatchCompact());
@@ -174,11 +174,11 @@ describe("standard intent", () => {
       const baseOrder = makeStandardOrder();
       const [baseOutput] = baseOrder.outputs;
       if (!baseOutput) throw new Error("Expected standard order output");
-      const baseIntent = new StandardOrderIntent(
+      const baseIntent = new StandardEVMIntent(
         INPUT_SETTLER_ESCROW_LIFI,
         baseOrder,
       );
-      const changedIntent = new StandardOrderIntent(
+      const changedIntent = new StandardEVMIntent(
         INPUT_SETTLER_ESCROW_LIFI,
         makeStandardOrder({
           outputs: [

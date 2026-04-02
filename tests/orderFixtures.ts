@@ -3,8 +3,8 @@ import { addressToBytes32 } from "../src/helpers/convert";
 import type {
   MandateOutput,
   MultichainOrder,
-  SolanaStandardOrder,
-  StandardOrder,
+  StandardEVM,
+  StandardSolana,
 } from "../src/types";
 
 export const CHAIN_ID_ETHEREUM = 1n;
@@ -39,8 +39,8 @@ export function makeMandateOutput(
 }
 
 export function makeStandardOrder(
-  overrides: Partial<StandardOrder> = {},
-): StandardOrder {
+  overrides: Partial<StandardEVM> = {},
+): StandardEVM {
   return {
     user: TEST_USER,
     nonce: 1n,
@@ -56,9 +56,9 @@ export function makeStandardOrder(
 
 export const CHAIN_ID_SOLANA_DEVNET = 1151111081099712n;
 
-export function makeSolanaStandardOrder(
-  overrides: Partial<SolanaStandardOrder> = {},
-): SolanaStandardOrder {
+export function makeStandardSolana(
+  overrides: Partial<StandardSolana> = {},
+): StandardSolana {
   return {
     user: TEST_USER,
     nonce: 1n,
@@ -66,10 +66,7 @@ export function makeSolanaStandardOrder(
     expires: TEST_NOW_SECONDS + 1000,
     fillDeadline: TEST_NOW_SECONDS + 900,
     inputOracle: TEST_POLYMER_ORACLE,
-    input: {
-      token: b32("a"),
-      amount: 1_000_000n,
-    },
+    inputs: [[BigInt(b32("a")), 1_000_000n]],
     outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
     ...overrides,
   };

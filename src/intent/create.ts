@@ -6,16 +6,16 @@ import type {
   CreateIntentOptions,
   EscrowLock,
   MultichainOrder,
-  StandardOrder,
+  StandardEVM,
+  StandardSolana,
   TokenContext,
-  SolanaStandardOrder,
 } from "../types/index";
 import { MultichainOrderIntent } from "./multichain";
-import { StandardOrderIntent } from "./standard";
+import { StandardEVMIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
 import { ONE_DAY, ONE_HOUR, inputSettlerForLock, inputSettlerForSolana } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
-import { SolanaStandardOrderIntent } from "./solanaStandard";
+import { StandardSolanaIntent } from "./solanaStandard";
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -90,38 +90,26 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const inputChain = firstInput.token.chainId;
-    const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
-      this.lock.type === "compact"
-        ? toId(
-            true,
-            this.lock.resetPeriod,
-            this.lock.allocatorId,
-            token.address,
-          )
-        : BigInt(token.address),
-      amount,
-    ]);
-
     const currentTime = Math.floor(Date.now() / 1000);
     // bytes32-padded address used as the mandate output recipient
     const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    switch (firstInput.token.chain) {
+    switch (firstInput.token.chainNameSpace) {
       case "solana": {
-        if (inputs.length > 1) {
+        if (this.inputs.length > 1) {
           throw new Error("SolanaStandardOrder only supports a single input");
         }
-        const solanaStandardOrder: SolanaStandardOrder = {
+        const solanaInputOracle = this.getOracle(this.verifier, inputChain);
+        if (!solanaInputOracle)
+          throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`);
+        const solanaStandardOrder: StandardSolana = {
           user: this.walletUser,
           nonce: this.nonce(),
           originChainId: inputChain,
           fillDeadline: currentTime + this.fillDeadline,
           expires: currentTime + this.expiry,
-          inputOracle: this.getOracle(this.verifier, inputChain)!,
-          input: {
-            token: firstInput.token.address,
-            amount: firstInput.amount,
-          },
+          inputOracle: solanaInputOracle,
+          inputs: [[BigInt(firstInput.token.address), firstInput.amount]],
           outputs: buildMandateOutputs({
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
@@ -132,16 +120,33 @@ export class Intent {
             currentTime,
           }),
         };
-        return new SolanaStandardOrderIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
+        return new StandardSolanaIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
       }
       default: {
-        const order: StandardOrder = {
+        const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
+          this.lock.type === "compact"
+            ? toId(true, this.lock.resetPeriod, this.lock.allocatorId, token.address)
+            : BigInt(token.address),
+          amount,
+        ]);
+        let evmInputOracle: `0x${string}`;
+
+        if (this.isSameChain()) {
+          evmInputOracle = COIN_FILLER;
+        } else {
+          const oracle = this.getOracle(this.verifier, inputChain);
+          if (!oracle)
+            throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`);
+          evmInputOracle = oracle;
+        }
+        
+        const order: StandardEVM = {
           user: this.walletUser,
           nonce: this.nonce(),
           originChainId: inputChain,
           fillDeadline: currentTime + this.fillDeadline,
           expires: currentTime + this.expiry,
-          inputOracle: this.isSameChain() ? COIN_FILLER : this.getOracle(this.verifier, inputChain)!,
+          inputOracle: evmInputOracle,
           inputs,
           outputs: buildMandateOutputs({
             exclusiveFor: this.exclusiveFor,
@@ -153,7 +158,7 @@ export class Intent {
             currentTime,
           }),
         };
-        return new StandardOrderIntent(inputSettlerForLock(this.lock, false), order);
+        return new StandardEVMIntent(inputSettlerForLock(this.lock, false), order);
       }
     }
   }
@@ -164,10 +169,9 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const currentTime = Math.floor(Date.now() / 1000);
-    const inputOracle = this.getOracle(
-      this.verifier,
-      firstInput.token.chainId,
-    )!;
+    const inputOracle = this.getOracle(this.verifier, firstInput.token.chainId);
+    if (!inputOracle)
+      throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${firstInput.token.chainId}`);
     const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),

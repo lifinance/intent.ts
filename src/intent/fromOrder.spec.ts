@@ -4,14 +4,17 @@ import {
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 } from "../constants";
 import { ResetPeriod } from "../compact/idLib";
-import { isStandardOrder, orderToIntent } from ".";
+import { isStandardSolana, orderToIntent } from ".";
 import { MultichainOrderIntent } from "./multichain";
-import { StandardOrderIntent } from "./standard";
+import { StandardEVMIntent } from "./standard";
+import { StandardSolanaIntent } from "./solanaStandard";
 import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
+  makeStandardSolana,
   makeStandardOrder,
 } from "../../tests/orderFixtures";
 
@@ -25,7 +28,7 @@ describe("intent core split", () => {
       order,
     });
 
-    expect(intent).toBeInstanceOf(StandardOrderIntent);
+    expect(intent).toBeInstanceOf(StandardEVMIntent);
     expect(intent.inputChains()).toEqual([CHAIN_ID_ETHEREUM]);
     expect(intent.orderId()).toBe(intent.orderId());
   });
@@ -73,8 +76,21 @@ describe("intent core split", () => {
     expect(intent.lock).toEqual(explicitLock);
   });
 
-  it("uses originChainId as the standard-vs-multichain discriminator", () => {
-    expect(isStandardOrder(makeStandardOrder())).toBe(true);
-    expect(isStandardOrder(makeMultichainOrder())).toBe(false);
+  it("isStandardSolana returns true only for solana orders", () => {
+    expect(isStandardSolana(makeStandardSolana())).toBe(true);
+    expect(isStandardSolana(makeStandardOrder())).toBe(false);
+    expect(isStandardSolana(makeMultichainOrder())).toBe(false);
+  });
+
+  it("hydrates a solana order into StandardSolanaIntent", () => {
+    const order = makeStandardSolana();
+    const intent = orderToIntent({
+      inputSettler: SOLANA_DEVNET_INPUT_SETTLER_ESCROW!,
+      order,
+    });
+
+    expect(intent).toBeInstanceOf(StandardSolanaIntent);
+    expect(intent.inputSettler).toBe(SOLANA_DEVNET_INPUT_SETTLER_ESCROW);
+    expect(intent.orderId()).toBe(intent.orderId());
   });
 });

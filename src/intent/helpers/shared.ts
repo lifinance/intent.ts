@@ -15,6 +15,7 @@ export function selectAllBut<T>(arr: T[], index: number): T[] {
   return [...arr.slice(0, index), ...arr.slice(index + 1, arr.length)];
 }
 
+/** Returns the deployed input settler program address for the given Solana chain ID. Throws for undeployed networks (mainnet, testnet). */
 export function inputSettlerForSolana(chainId: bigint): `0x${string}` {
   const settler = SOLANA_INPUT_SETTLER_PROGRAMS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Solana chain id: ${chainId}`);
