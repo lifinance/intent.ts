@@ -9,11 +9,6 @@ export type MandateOutput = {
   context: `0x${string}`;
 };
 
-export type MandateInput = {
-  token: `0x${string}`;
-  amount: bigint;
-};
-
 export type CompactMandate = {
   fillDeadline: number;
   inputOracle: `0x${string}`;

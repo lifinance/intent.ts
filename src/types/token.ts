@@ -6,7 +6,7 @@ export type CoreToken = {
   chainId: bigint;
   decimals: number;
   // CAIP namespace
-  chainNameSpace: Namespace;
+  chainNamespace: Namespace;
 };
 
 export type TokenContext = {

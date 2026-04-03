@@ -38,7 +38,7 @@ export function makeMandateOutput(
   };
 }
 
-export function makeStandardOrder(
+export function makeStandardEvm(
   overrides: Partial<StandardEVM> = {},
 ): StandardEVM {
   return {

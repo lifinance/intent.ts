@@ -11,7 +11,7 @@ import {
   b32,
   makeMandateOutput,
   makeStandardSolana,
-  makeStandardOrder,
+  makeStandardEvm,
   CHAIN_ID_ARBITRUM,
 } from "../../tests/orderFixtures";
 import type { StandardSolana } from "../types";
@@ -183,7 +183,7 @@ describe("solana standard intent", () => {
 
   describe("standardOrderToSolanaOrder", () => {
     it("converts a single-input StandardOrder correctly", () => {
-      const std = makeStandardOrder();
+      const std = makeStandardEvm();
       const [firstInput] = std.inputs;
       if (!firstInput) throw new Error("Expected input");
       const [tokenBigInt, amount] = firstInput;
@@ -202,13 +202,13 @@ describe("solana standard intent", () => {
     });
 
     it("throws when inputs is empty", () => {
-      const std = makeStandardOrder({ inputs: [] });
+      const std = makeStandardEvm({ inputs: [] });
 
       expect(() => standardOrderToSolanaOrder(std)).toThrow("No inputs in order");
     });
 
     it("throws when there are multiple inputs", () => {
-      const std = makeStandardOrder({ inputs: [[1n, 1n], [2n, 2n]] });
+      const std = makeStandardEvm({ inputs: [[1n, 1n], [2n, 2n]] });
 
       expect(() => standardOrderToSolanaOrder(std)).toThrow(
         "StandardSolana only supports a single input",

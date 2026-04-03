@@ -15,12 +15,12 @@ import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
   makeStandardSolana,
-  makeStandardOrder,
+  makeStandardEvm,
 } from "../../tests/orderFixtures";
 
 describe("intent core split", () => {
   it("hydrates a standard order and keeps orderId deterministic", () => {
-    const order = makeStandardOrder({
+    const order = makeStandardEvm({
       originChainId: CHAIN_ID_ETHEREUM,
     });
     const intent = orderToIntent({
@@ -78,7 +78,7 @@ describe("intent core split", () => {
 
   it("isStandardSolana returns true only for solana orders", () => {
     expect(isStandardSolana(makeStandardSolana())).toBe(true);
-    expect(isStandardSolana(makeStandardOrder())).toBe(false);
+    expect(isStandardSolana(makeStandardEvm())).toBe(false);
     expect(isStandardSolana(makeMultichainOrder())).toBe(false);
   });
 

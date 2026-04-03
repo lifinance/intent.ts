@@ -94,7 +94,7 @@ export class Intent {
     // bytes32-padded address used as the mandate output recipient
     const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    switch (firstInput.token.chainNameSpace) {
+    switch (firstInput.token.chainNamespace) {
       case "solana": {
         if (this.inputs.length > 1) {
           throw new Error("SolanaStandardOrder only supports a single input");

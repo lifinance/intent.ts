@@ -6,7 +6,7 @@ import {
 import { compactClaimHash as computeCompactClaimHash } from "./compact/claims";
 import { toStandardBatchCompact } from "./compact/conversions";
 import { computeStandardEVMId, StandardEVMIntent } from "./standard";
-import { makeStandardOrder } from "../../tests/orderFixtures";
+import { makeStandardEvm } from "../../tests/orderFixtures";
 import type { StandardOrder } from "../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
@@ -17,7 +17,7 @@ function expectBytes32Hex(value: `0x${string}`) {
 describe("standard intent", () => {
   describe("computeStandardEVMId", () => {
     it("is deterministic for identical inputs", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const id1 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
       const id2 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
 
@@ -26,7 +26,7 @@ describe("standard intent", () => {
     });
 
     it("changes when inputSettler changes", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const id1 = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
       const id2 = computeStandardEVMId(INPUT_SETTLER_COMPACT_LIFI, order);
 
@@ -34,7 +34,7 @@ describe("standard intent", () => {
     });
 
     it("changes when order-id fields change", () => {
-      const baseOrder = makeStandardOrder();
+      const baseOrder = makeStandardEvm();
       const [firstInput] = baseOrder.inputs;
       const [firstOutput] = baseOrder.outputs;
       if (!firstInput || !firstOutput)
@@ -119,21 +119,21 @@ describe("standard intent", () => {
 
   describe("StandardEVMIntent", () => {
     it("returns the original order from asOrder", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(intent.asOrder()).toBe(order);
     });
 
     it("returns the origin chain as the only input chain", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
 
       expect(intent.inputChains()).toEqual([order.originChainId]);
     });
 
     it("computes a deterministic orderId from its current state", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const id1 = intent.orderId();
       const id2 = intent.orderId();
@@ -146,7 +146,7 @@ describe("standard intent", () => {
     });
 
     it("asBatchCompact maps order fields and uses compact arbiter constant", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const batch = intent.asBatchCompact();
       const expected = toStandardBatchCompact(
@@ -159,7 +159,7 @@ describe("standard intent", () => {
     });
 
     it("compactClaimHash matches claim hash of asBatchCompact and is deterministic", () => {
-      const order = makeStandardOrder();
+      const order = makeStandardEvm();
       const intent = new StandardEVMIntent(INPUT_SETTLER_ESCROW_LIFI, order);
       const claimHash1 = intent.compactClaimHash();
       const claimHash2 = intent.compactClaimHash();
@@ -171,7 +171,7 @@ describe("standard intent", () => {
     });
 
     it("compactClaimHash changes when commitments or mandate fields change", () => {
-      const baseOrder = makeStandardOrder();
+      const baseOrder = makeStandardEvm();
       const [baseOutput] = baseOrder.outputs;
       if (!baseOutput) throw new Error("Expected standard order output");
       const baseIntent = new StandardEVMIntent(
@@ -180,7 +180,7 @@ describe("standard intent", () => {
       );
       const changedIntent = new StandardEVMIntent(
         INPUT_SETTLER_ESCROW_LIFI,
-        makeStandardOrder({
+        makeStandardEvm({
           outputs: [
             {
               ...baseOutput,

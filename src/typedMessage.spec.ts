@@ -16,7 +16,7 @@ import {
   compactTypes,
   multichain_compact_type_hash,
 } from "./typedMessage";
-import { makeMultichainOrder, makeStandardOrder } from "../tests/orderFixtures";
+import { makeMultichainOrder, makeStandardEvm } from "../tests/orderFixtures";
 
 const HEX_32_REGEX = /^0x[0-9a-fA-F]{64}$/;
 const COMPACT_TYPE_HASH_CONTRACT =
@@ -50,7 +50,7 @@ describe("typedMessage", () => {
 
   it("computes deterministic compact and multichain compact claim hashes", () => {
     const batchCompact = toStandardBatchCompact(
-      makeStandardOrder(),
+      makeStandardEvm(),
       INPUT_SETTLER_COMPACT_LIFI,
     );
     const multichainCompact = toMultichainBatchCompact(

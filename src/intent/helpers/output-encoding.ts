@@ -54,10 +54,10 @@ export function buildMandateOutputs(options: {
   }
 
   return outputTokens.map(({ token, amount }) => {
-    const solanaSettler = token.chainNameSpace === "solana"
+    const solanaSettler = token.chainNamespace === "solana"
       ? SOLANA_OUTPUT_SETTLER_PDAS[token.chainId.toString()]
       : undefined;
-    if (token.chainNameSpace === "solana" && !solanaSettler)
+    if (token.chainNamespace === "solana" && !solanaSettler)
       throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
     
     const outputSettler = solanaSettler ?? COIN_FILLER;
