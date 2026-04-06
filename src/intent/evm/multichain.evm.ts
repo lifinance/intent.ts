@@ -8,15 +8,15 @@ import {
 import {
   MULTICHAIN_COMPACT_TYPEHASH_WITH_WITNESS,
   multichainCompactClaimHash,
-} from "./compact/claims";
+} from "../compact/claims";
 import {
   inputsToLocks,
   toMultichainBatchCompact,
   toMultichainElements,
-} from "./compact/conversions";
-import { encodeOutputs } from "./helpers/output-encoding";
-import { selectAllBut } from "./helpers/shared";
-import { compactTypes } from "../typedMessage";
+} from "../compact/conversions";
+import { encodeOutputs } from "../helpers/output-encoding";
+import { selectAllBut } from "../helpers/shared";
+import { compactTypes } from "../../typedMessage";
 import type {
   CompactLock,
   CompactMandate,
@@ -25,8 +25,8 @@ import type {
   MultichainCompact,
   MultichainOrder,
   MultichainOrderComponent,
-} from "../types/index";
-import type { EvmOrderIntent } from "./types";
+} from "../../types/index";
+import type { EvmOrderIntent } from "../types";
 
 /**
  * @notice Hashes a multichain input segment using the chain id and encoded input locks.

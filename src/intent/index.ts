@@ -4,14 +4,18 @@ export {
   borshEncodeSolanaOrder,
   computeStandardSolanaId,
   standardOrderToSolanaOrder,
-} from "./solanaStandard";
+} from "./solana/standard.solana";
 export { isStandardOrder, isStandardSolana, orderToIntent } from "./fromOrder";
-export { StandardEVMIntent, computeStandardEVMId } from "./standard";
-export type { OrderIntentCommon, EvmOrderIntent, SolanaOrderIntent } from "./types";
+export { StandardEVMIntent, computeStandardEVMId } from "./evm/standard.evm";
+export type {
+  OrderIntentCommon,
+  EvmOrderIntent,
+  SolanaOrderIntent,
+} from "./types";
 export {
   MultichainOrderIntent,
   hashMultichainInputs,
   constructInputHash,
   computeMultichainEscrowOrderId,
   computeMultichainCompactOrderId,
-} from "./multichain";
+} from "./evm/multichain.evm";

@@ -3,14 +3,14 @@ import { encodePacked, keccak256 } from "viem";
 import {
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
-} from "../constants";
-import { ResetPeriod } from "../compact/idLib";
+} from "../../constants";
+import { ResetPeriod } from "../../compact/idLib";
 import {
   constructInputHash,
   hashMultichainInputs,
   MultichainOrderIntent,
-} from "./multichain";
-import { b32, makeMultichainOrder } from "../../tests/orderFixtures";
+} from "./multichain.evm";
+import { b32, makeMultichainOrder } from "../../../tests/orderFixtures";
 
 function expectBytes32Hex(value: `0x${string}`) {
   expect(value.startsWith("0x")).toBe(true);

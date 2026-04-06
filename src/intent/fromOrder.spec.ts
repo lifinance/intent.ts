@@ -8,15 +8,22 @@ import {
 } from "../constants";
 import { ResetPeriod } from "../compact/idLib";
 import { isStandardSolana, orderToIntent } from ".";
-import { MultichainOrderIntent } from "./multichain";
-import { StandardEVMIntent } from "./standard";
-import { StandardSolanaIntent } from "./solanaStandard";
+import { MultichainOrderIntent } from "./evm/multichain.evm";
+import { StandardEVMIntent } from "./evm/standard.evm";
+import { StandardSolanaIntent } from "./solana/standard.solana";
+import { asStandardIntent } from "./standard";
 import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
   makeStandardSolana,
   makeStandardEvm,
+  makeMandateOutput,
+  TEST_POLYMER_ORACLE,
+  TEST_NOW_SECONDS,
+  TEST_USER,
+  CHAIN_ID_ARBITRUM,
 } from "../../tests/orderFixtures";
+import type { StandardOrder } from "../types";
 
 describe("intent core split", () => {
   it("hydrates a standard order and keeps orderId deterministic", () => {
@@ -92,5 +99,35 @@ describe("intent core split", () => {
     expect(intent).toBeInstanceOf(StandardSolanaIntent);
     expect(intent.inputSettler).toBe(SOLANA_DEVNET_INPUT_SETTLER_ESCROW);
     expect(intent.orderId()).toBe(intent.orderId());
+  });
+
+  it("remove me please", () => {
+    const myIntent: StandardOrder = {
+      user: TEST_USER,
+      nonce: 1n,
+      originChainId: CHAIN_ID_ETHEREUM,
+      expires: TEST_NOW_SECONDS + 1000,
+      fillDeadline: TEST_NOW_SECONDS + 900,
+      inputOracle: TEST_POLYMER_ORACLE,
+      inputs: [[1n, 1n]],
+      outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
+    };
+
+    asStandardIntent;
+
+    const solanaintent = asStandardIntent({
+      namespace: "solana",
+      order: myIntent,
+      inputSettler: "0x",
+    });
+    const evmintent = asStandardIntent({
+      namespace: "eip155",
+      order: myIntent,
+      inputSettler: "0x",
+    });
+
+    evmintent.compactClaimHash;
+
+    solanaintent.borshEncode;
   });
 });

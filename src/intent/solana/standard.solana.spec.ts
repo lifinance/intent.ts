@@ -1,20 +1,20 @@
 import { describe, expect, it } from "bun:test";
 
-import { SOLANA_DEVNET_INPUT_SETTLER_ESCROW } from "../constants";
+import { SOLANA_DEVNET_INPUT_SETTLER_ESCROW } from "../../constants";
 import {
   borshEncodeSolanaOrder,
   computeStandardSolanaId,
   StandardSolanaIntent,
   standardOrderToSolanaOrder,
-} from "./solanaStandard";
+} from "./standard.solana.ts";
 import {
   b32,
   makeMandateOutput,
   makeStandardSolana,
   makeStandardEvm,
   CHAIN_ID_ARBITRUM,
-} from "../../tests/orderFixtures";
-import type { StandardSolana } from "../types";
+} from "../../../tests/orderFixtures";
+import type { StandardSolana } from "../../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
   expect(value.startsWith("0x")).toBe(true);
@@ -212,7 +212,7 @@ describe("solana standard intent", () => {
       const std = makeStandardEvm({ inputs: [] });
 
       expect(() => standardOrderToSolanaOrder(std)).toThrow(
-        "No inputs in order",
+        "Standard Solana order takes exactly 1 input",
       );
     });
 
@@ -225,7 +225,7 @@ describe("solana standard intent", () => {
       });
 
       expect(() => standardOrderToSolanaOrder(std)).toThrow(
-        "StandardSolana only supports a single input",
+        "Standard Solana order takes exactly 1 input",
       );
     });
   });

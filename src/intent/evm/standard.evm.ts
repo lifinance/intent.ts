@@ -1,10 +1,9 @@
 import { encodePacked, keccak256 } from "viem";
-import { INPUT_SETTLER_COMPACT_LIFI } from "../constants";
-import { compactClaimHash } from "./compact/claims";
-import { toStandardBatchCompact } from "./compact/conversions";
-import { encodeOutputs } from "./helpers/output-encoding";
-import type { BatchCompact, StandardEVM } from "../types/index";
-import type { EvmOrderIntent } from "./types";
+import { INPUT_SETTLER_COMPACT_LIFI } from "../../constants";
+import { compactClaimHash } from "../compact/claims";
+import { toStandardBatchCompact } from "../compact/conversions";
+import { encodeOutputs } from "../helpers/output-encoding";
+import type { BatchCompact, StandardEVM } from "../../types/index";
 
 export function computeStandardEVMId(
   inputSettler: `0x${string}`,
@@ -38,12 +37,14 @@ export function computeStandardEVMId(
   );
 }
 
-export class StandardEVMIntent implements EvmOrderIntent<StandardEVM> {
+export class StandardEVMIntent {
   inputSettler: `0x${string}`;
   private readonly order: StandardEVM;
 
-  constructor(inputSetter: `0x${string}`, order: StandardEVM) {
-    this.inputSettler = inputSetter;
+  readonly namespace = "eip155";
+
+  constructor(inputSettler: `0x${string}`, order: StandardEVM) {
+    this.inputSettler = inputSettler;
     this.order = order;
   }
 

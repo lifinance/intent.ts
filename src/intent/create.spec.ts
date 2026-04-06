@@ -21,9 +21,9 @@ import type {
   TokenContext,
 } from "../types";
 import { Intent } from "./create";
-import { MultichainOrderIntent } from "./multichain";
-import { StandardEVMIntent } from "./standard";
-import { StandardSolanaIntent } from "./solanaStandard";
+import { MultichainOrderIntent } from "./evm/multichain.evm";
+import { StandardEVMIntent } from "./evm/standard.evm";
+import { StandardSolanaIntent } from "./solana/standard.solana";
 
 const originalDateNow = Date.now;
 const originalMathRandom = Math.random;
@@ -225,14 +225,17 @@ describe("Intent", () => {
       getOracle(verifier, chainId) {
         if (verifier !== "polymer") return undefined;
         if (chainId === SOLANA_DEVNET_CHAIN_ID) return SOLANA_DEVNET_ORACLE;
-        return [CHAIN_ID_ETHEREUM, CHAIN_ID_ARBITRUM, CHAIN_ID_BASE].includes(chainId)
+        return [CHAIN_ID_ETHEREUM, CHAIN_ID_ARBITRUM, CHAIN_ID_BASE].includes(
+          chainId,
+        )
           ? TEST_POLYMER_ORACLE
           : undefined;
       },
     };
 
     const SOLANA_USDC: CoreToken = {
-      address: "0xab11111111111111111111111111111111111111111111111111111111111111",
+      address:
+        "0xab11111111111111111111111111111111111111111111111111111111111111",
       name: "USDC",
       chainId: SOLANA_DEVNET_CHAIN_ID,
       decimals: 6,
@@ -241,7 +244,10 @@ describe("Intent", () => {
 
     it("returns SolanaStandardEVMIntent for a solana input token", () => {
       const intent = new Intent(
-        makeEscrowOptions([ctx(SOLANA_USDC, 1_000_000n)], [ctx(ARB_USDC, 1_000_000n)]),
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
         solanaIntentDeps,
       );
       const result = intent.singlechain();
@@ -252,7 +258,10 @@ describe("Intent", () => {
 
     it("sets inputOracle from the oracle resolver", () => {
       const intent = new Intent(
-        makeEscrowOptions([ctx(SOLANA_USDC, 1_000_000n)], [ctx(ARB_USDC, 1_000_000n)]),
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
         solanaIntentDeps,
       );
       const order = intent.singlechain().asOrder();

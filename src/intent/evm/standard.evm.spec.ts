@@ -2,12 +2,12 @@ import { describe, expect, it } from "bun:test";
 import {
   INPUT_SETTLER_COMPACT_LIFI,
   INPUT_SETTLER_ESCROW_LIFI,
-} from "../constants";
-import { compactClaimHash as computeCompactClaimHash } from "./compact/claims";
-import { toStandardBatchCompact } from "./compact/conversions";
-import { computeStandardEVMId, StandardEVMIntent } from "./standard";
-import { makeStandardEvm } from "../../tests/orderFixtures";
-import type { StandardOrder } from "../types";
+} from "../../constants";
+import { compactClaimHash as computeCompactClaimHash } from "../compact/claims";
+import { toStandardBatchCompact } from "../compact/conversions";
+import { computeStandardEVMId, StandardEVMIntent } from "./standard.evm";
+import { makeStandardEvm } from "../../../tests/orderFixtures";
+import type { StandardOrder } from "../../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
   expect(value.startsWith("0x")).toBe(true);

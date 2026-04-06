@@ -7,16 +7,15 @@ import type {
   StandardOrder,
 } from "../types/index";
 import {
-  INPUT_SETTLER_COMPACT_LIFI,
-  MULTICHAIN_INPUT_SETTLER_COMPACT,
   SOLANA_MAINNET_CHAIN_ID,
   SOLANA_TESTNET_CHAIN_ID,
   SOLANA_DEVNET_CHAIN_ID,
 } from "../constants";
-import { ResetPeriod } from "../compact/idLib";
-import { MultichainOrderIntent } from "./multichain";
-import { StandardEVMIntent } from "./standard";
-import { StandardSolanaIntent } from "./solanaStandard";
+import { MultichainOrderIntent } from "./evm/multichain.evm";
+import { StandardEVMIntent } from "./evm/standard.evm";
+import { StandardSolanaIntent } from "./solana/standard.solana";
+import { asMultichainIntent } from "./multichain";
+import { asStandardIntent } from "./standard";
 
 type OrderLike = StandardOrder | MultichainOrder;
 
@@ -42,40 +41,23 @@ type OrderToIntentOptions = {
   lock?: EscrowLock | CompactLock;
 };
 
-function inferLock(inputSettler: `0x${string}`): EscrowLock | CompactLock {
-  const normalized = inputSettler.toLowerCase();
-  if (
-    normalized === INPUT_SETTLER_COMPACT_LIFI.toLowerCase() ||
-    normalized === MULTICHAIN_INPUT_SETTLER_COMPACT.toLowerCase()
-  ) {
-    return {
-      type: "compact",
-      resetPeriod: ResetPeriod.OneDay,
-      allocatorId: "0",
-    };
-  }
-  return { type: "escrow" };
-}
-
 const SOLANA_CHAIN_IDS = new Set([
   SOLANA_MAINNET_CHAIN_ID,
   SOLANA_TESTNET_CHAIN_ID,
   SOLANA_DEVNET_CHAIN_ID,
 ]);
 
-export function isStandardOrder(order: StandardOrder | MultichainOrder): order is StandardOrder {
+export function isStandardOrder(
+  order: StandardOrder | MultichainOrder,
+): order is StandardOrder {
   return "originChainId" in order;
 }
 
 export function isStandardSolana(order: OrderLike): order is StandardSolana {
-  return "originChainId" in order && "inputs" in order && SOLANA_CHAIN_IDS.has((order as StandardOrder).originChainId);
-}
-
-function resolveStandardToIntent(order: StandardOrder, inputSettler: `0x${string}`): StandardEVMIntent | StandardSolanaIntent {
-  if (isStandardSolana(order)) {
-    return new StandardSolanaIntent(inputSettler, order);
-  }
-  return new StandardEVMIntent(inputSettler, order);
+  return (
+    "originChainId" in order &&
+    SOLANA_CHAIN_IDS.has((order as StandardOrder).originChainId)
+  );
 }
 
 export function orderToIntent(
@@ -99,11 +81,14 @@ export function orderToIntent(
 ): StandardEVMIntent | StandardSolanaIntent | MultichainOrderIntent {
   const { inputSettler, order } = options;
 
-  if (isStandardOrder(order)) {
-    return resolveStandardToIntent(order, inputSettler);
+  if (!isStandardOrder(order)) {
+    const lock = "lock" in options ? options.lock : undefined;
+    return asMultichainIntent({ order, inputSettler, lock });
   }
 
-  const lock = "lock" in options ? options.lock ?? inferLock(inputSettler) : inferLock(inputSettler);
+  if (isStandardSolana(order)) {
+    return asStandardIntent({ namespace: "solana", order, inputSettler });
+  }
 
-  return new MultichainOrderIntent(inputSettler, order as MultichainOrder, lock);
+  return asStandardIntent({ namespace: "eip155", order, inputSettler });
 }
