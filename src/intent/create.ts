@@ -77,6 +77,10 @@ export class Intent {
     return inputChain === outputChain;
   }
 
+  private get recipient(): `0x${string}` {
+    return addressToBytes32(this.outputRecipient ?? this.walletUser);
+  }
+
   nonce() {
     if (this._nonce !== undefined) return this._nonce;
     this._nonce = BigInt(1 + Math.floor(Math.random() * (2 ** 32 - 1)));
@@ -96,10 +100,8 @@ export class Intent {
     }
     const inputChain = firstInput.token.chainId;
     const currentTime = Math.floor(Date.now() / 1000);
-    // bytes32-padded address used as the mandate output recipient
-    const recipient = this.outputRecipient
-      ? addressToBytes32(this.outputRecipient)
-      : addressToBytes32(this.walletUser);
+    const sameChain = this.isSameChain();
+    const { recipient } = this;
 
     switch (firstInput.token.chainNamespace) {
       case "solana": {
@@ -124,7 +126,7 @@ export class Intent {
             outputTokens: this.outputs,
             getOracle: this.getOracle,
             verifier: this.verifier,
-            sameChain: this.isSameChain(),
+            sameChain,
             recipient,
             currentTime,
           }),
@@ -150,7 +152,7 @@ export class Intent {
         );
         let evmInputOracle: `0x${string}`;
 
-        if (this.isSameChain()) {
+        if (sameChain) {
           evmInputOracle = COIN_FILLER;
         } else {
           const oracle = this.getOracle(this.verifier, inputChain);
@@ -174,7 +176,7 @@ export class Intent {
             outputTokens: this.outputs,
             getOracle: this.getOracle,
             verifier: this.verifier,
-            sameChain: this.isSameChain(),
+            sameChain,
             recipient,
             currentTime,
           }),
@@ -198,9 +200,7 @@ export class Intent {
       throw new Error(
         `No oracle configured for verifier "${this.verifier}" on chain ${firstInput.token.chainId}`,
       );
-    const recipient = this.outputRecipient
-      ? addressToBytes32(this.outputRecipient)
-      : addressToBytes32(this.walletUser);
+    const { recipient } = this;
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),
     ].map((chain) => {

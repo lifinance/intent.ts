@@ -199,10 +199,10 @@ export class MultichainOrderIntent implements OrderIntent<MultichainOrder> {
 
     const [orderId] = computedOrderIds;
     if (!orderId) throw new Error("No order components available");
-    computedOrderIds.map((v) => {
+    for (const v of computedOrderIds) {
       if (v !== orderId)
         throw new Error(`Order ids are not equal ${computedOrderIds}`);
-    });
+    }
 
     if (this.lock.type === "compact") {
       const multichainCompactHash = multichainCompactClaimHash(
@@ -222,12 +222,7 @@ export class MultichainOrderIntent implements OrderIntent<MultichainOrder> {
     additionalChains: `0x${string}`[];
   }[] {
     const inputsHash: `0x${string}`[] = this.order.inputs.map((input) =>
-      keccak256(
-        encodePacked(
-          ["uint256", "uint256[2][]"],
-          [input.chainId, input.inputs],
-        ),
-      ),
+      hashMultichainInputs(input.chainId, input.inputs),
     );
     return this.order.inputs.map((v, i) => {
       return {
