@@ -26,7 +26,7 @@ import type {
   MultichainOrder,
   MultichainOrderComponent,
 } from "../../types/index";
-import type { EvmOrderIntent } from "../types";
+import type { OrderIntent } from "../types";
 
 /**
  * @notice Hashes a multichain input segment using the chain id and encoded input locks.
@@ -161,9 +161,10 @@ export function computeMultichainCompactOrderId(
   );
 }
 
-export class MultichainOrderIntent implements EvmOrderIntent<MultichainOrder> {
+export class MultichainOrderIntent implements OrderIntent<MultichainOrder> {
   lock: EscrowLock | CompactLock;
   inputSettler: `0x${string}`;
+  readonly namespace = "eip155" as const;
   private readonly order: MultichainOrder;
 
   constructor(

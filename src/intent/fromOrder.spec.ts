@@ -7,23 +7,16 @@ import {
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 } from "../constants";
 import { ResetPeriod } from "../compact/idLib";
-import { isStandardSolana, orderToIntent } from ".";
+import { orderToIntent } from ".";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
-import { asStandardIntent } from "./standard";
 import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
   makeStandardSolana,
   makeStandardEvm,
-  makeMandateOutput,
-  TEST_POLYMER_ORACLE,
-  TEST_NOW_SECONDS,
-  TEST_USER,
-  CHAIN_ID_ARBITRUM,
 } from "../../tests/orderFixtures";
-import type { StandardOrder } from "../types";
 
 describe("intent core split", () => {
   it("hydrates a standard order and keeps orderId deterministic", () => {
@@ -31,6 +24,7 @@ describe("intent core split", () => {
       originChainId: CHAIN_ID_ETHEREUM,
     });
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: INPUT_SETTLER_ESCROW_LIFI,
       order,
     });
@@ -42,6 +36,7 @@ describe("intent core split", () => {
 
   it("hydrates a multichain order and computes one shared orderId", () => {
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: MULTICHAIN_INPUT_SETTLER_ESCROW,
       order: makeMultichainOrder(),
     });
@@ -56,6 +51,7 @@ describe("intent core split", () => {
 
   it("infers compact lock for compact settlers", () => {
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: MULTICHAIN_INPUT_SETTLER_COMPACT,
       order: makeMultichainOrder(),
     });
@@ -75,6 +71,7 @@ describe("intent core split", () => {
     };
 
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: INPUT_SETTLER_COMPACT_LIFI,
       order: makeMultichainOrder(),
       lock: explicitLock,
@@ -83,15 +80,10 @@ describe("intent core split", () => {
     expect(intent.lock).toEqual(explicitLock);
   });
 
-  it("isStandardSolana returns true only for solana orders", () => {
-    expect(isStandardSolana(makeStandardSolana())).toBe(true);
-    expect(isStandardSolana(makeStandardEvm())).toBe(false);
-    expect(isStandardSolana(makeMultichainOrder())).toBe(false);
-  });
-
   it("hydrates a solana order into StandardSolanaIntent", () => {
     const order = makeStandardSolana();
     const intent = orderToIntent({
+      namespace: "solana",
       inputSettler: SOLANA_DEVNET_INPUT_SETTLER_ESCROW!,
       order,
     });
@@ -99,35 +91,5 @@ describe("intent core split", () => {
     expect(intent).toBeInstanceOf(StandardSolanaIntent);
     expect(intent.inputSettler).toBe(SOLANA_DEVNET_INPUT_SETTLER_ESCROW);
     expect(intent.orderId()).toBe(intent.orderId());
-  });
-
-  it("remove me please", () => {
-    const myIntent: StandardOrder = {
-      user: TEST_USER,
-      nonce: 1n,
-      originChainId: CHAIN_ID_ETHEREUM,
-      expires: TEST_NOW_SECONDS + 1000,
-      fillDeadline: TEST_NOW_SECONDS + 900,
-      inputOracle: TEST_POLYMER_ORACLE,
-      inputs: [[1n, 1n]],
-      outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
-    };
-
-    asStandardIntent;
-
-    const solanaintent = asStandardIntent({
-      namespace: "solana",
-      order: myIntent,
-      inputSettler: "0x",
-    });
-    const evmintent = asStandardIntent({
-      namespace: "eip155",
-      order: myIntent,
-      inputSettler: "0x",
-    });
-
-    evmintent.compactClaimHash;
-
-    solanaintent.borshEncode;
   });
 });

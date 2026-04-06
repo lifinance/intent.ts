@@ -4,6 +4,7 @@ import { compactClaimHash } from "../compact/claims";
 import { toStandardBatchCompact } from "../compact/conversions";
 import { encodeOutputs } from "../helpers/output-encoding";
 import type { BatchCompact, StandardEVM } from "../../types/index";
+import type { OrderIntent } from "../types";
 
 export function computeStandardEVMId(
   inputSettler: `0x${string}`,
@@ -37,7 +38,7 @@ export function computeStandardEVMId(
   );
 }
 
-export class StandardEVMIntent {
+export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   inputSettler: `0x${string}`;
   private readonly order: StandardEVM;
 

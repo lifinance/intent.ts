@@ -5,7 +5,7 @@ import type {
   StandardOrder,
   StandardSolana,
 } from "../../types/index";
-import type { SolanaOrderIntent } from "../types";
+import type { OrderIntent } from "../types";
 
 // -- Borsh schemas ---------------------------------------------------------- //
 // Mirrors `common::types::StandardSolana` in catalyst-intent-svm.
@@ -117,8 +117,9 @@ export function standardOrderToSolanaOrder(
 
 // -- Intent class ----------------------------------------------------------- //
 
-export class StandardSolanaIntent implements SolanaOrderIntent {
+export class StandardSolanaIntent implements OrderIntent<StandardSolana> {
   inputSettler: `0x${string}`;
+  readonly namespace = "solana" as const;
   private readonly order: StandardSolana;
 
   constructor(inputSettler: `0x${string}`, order: StandardSolana) {
@@ -130,8 +131,8 @@ export class StandardSolanaIntent implements SolanaOrderIntent {
     return this.order;
   }
 
-  inputChain(): bigint {
-    return this.order.originChainId;
+  inputChains(): bigint[] {
+    return [this.order.originChainId];
   }
 
   borshEncode(): Uint8Array {

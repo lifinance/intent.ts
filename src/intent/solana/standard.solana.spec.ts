@@ -248,7 +248,7 @@ describe("solana standard intent", () => {
         order,
       );
 
-      expect(intent.inputChain()).toEqual(order.originChainId);
+      expect(intent.inputChains()).toEqual([order.originChainId]);
     });
 
     it("computes a deterministic orderId from its current state", () => {
