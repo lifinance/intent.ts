@@ -3,12 +3,12 @@ import { INPUT_SETTLER_COMPACT_LIFI } from "../constants";
 import { compactClaimHash } from "./compact/claims";
 import { toStandardBatchCompact } from "./compact/conversions";
 import { encodeOutputs } from "./helpers/output-encoding";
-import type { BatchCompact, StandardOrder } from "../types/index";
-import type { OrderIntentCommon } from "./types";
+import type { BatchCompact, StandardEVM } from "../types/index";
+import type { EvmOrderIntent } from "./types";
 
-export function computeStandardOrderId(
+export function computeStandardEVMId(
   inputSettler: `0x${string}`,
-  order: StandardOrder,
+  order: StandardEVM,
 ): `0x${string}` {
   return keccak256(
     encodePacked(
@@ -38,16 +38,16 @@ export function computeStandardOrderId(
   );
 }
 
-export class StandardOrderIntent implements OrderIntentCommon<StandardOrder> {
+export class StandardEVMIntent implements EvmOrderIntent<StandardEVM> {
   inputSettler: `0x${string}`;
-  private readonly order: StandardOrder;
+  private readonly order: StandardEVM;
 
-  constructor(inputSetter: `0x${string}`, order: StandardOrder) {
+  constructor(inputSetter: `0x${string}`, order: StandardEVM) {
     this.inputSettler = inputSetter;
     this.order = order;
   }
 
-  asOrder(): StandardOrder {
+  asOrder(): StandardEVM {
     return this.order;
   }
 
@@ -60,7 +60,7 @@ export class StandardOrderIntent implements OrderIntentCommon<StandardOrder> {
   }
 
   orderId(): `0x${string}` {
-    return computeStandardOrderId(this.inputSettler, this.order);
+    return computeStandardEVMId(this.inputSettler, this.order);
   }
 
   compactClaimHash(): `0x${string}` {

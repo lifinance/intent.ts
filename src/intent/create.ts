@@ -6,13 +6,16 @@ import type {
   CreateIntentOptions,
   EscrowLock,
   MultichainOrder,
-  StandardOrder,
+  StandardEVM,
+  StandardSolana,
   TokenContext,
 } from "../types/index";
 import { MultichainOrderIntent } from "./multichain";
-import { StandardOrderIntent } from "./standard";
+import { StandardEVMIntent } from "./standard";
 import { buildMandateOutputs } from "./helpers/output-encoding";
-import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
+import { ONE_DAY, ONE_HOUR, inputSettlerForLock, inputSettlerForSolana } from "./helpers/shared";
+import { addressToBytes32 } from "../helpers/convert";
+import { StandardSolanaIntent } from "./solanaStandard";
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -20,12 +23,13 @@ import { ONE_DAY, ONE_HOUR, inputSettlerForLock } from "./helpers/shared";
 export class Intent {
   private lock: EscrowLock | CompactLock;
 
-  private user: `0x${string}`;
+  private walletUser: `0x${string}`;
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
   private verifier: string;
   private exclusiveFor?: `0x${string}`;
+  private outputRecipient?: `0x${string}`;
 
   private _nonce?: bigint;
   private expiry = ONE_DAY;
@@ -33,12 +37,13 @@ export class Intent {
 
   constructor(opts: CreateIntentOptions, deps: IntentDeps) {
     this.lock = opts.lock;
-    this.user = opts.account;
+    this.walletUser = opts.account;
     this.inputs = opts.inputTokens;
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
     this.getOracle = deps.getOracle;
     this.exclusiveFor = opts.exclusiveFor;
+    this.outputRecipient = opts.outputRecipient;
   }
 
   numInputChains() {
@@ -85,46 +90,77 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const inputChain = firstInput.token.chainId;
-    const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
-      this.lock.type === "compact"
-        ? toId(
-            true,
-            this.lock.resetPeriod,
-            this.lock.allocatorId,
-            token.address,
-          )
-        : BigInt(token.address),
-      amount,
-    ]);
-
     const currentTime = Math.floor(Date.now() / 1000);
-    const inputOracle = this.isSameChain()
-      ? COIN_FILLER
-      : this.getOracle(this.verifier, inputChain)!;
+    // bytes32-padded address used as the mandate output recipient
+    const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
 
-    const order: StandardOrder = {
-      user: this.user,
-      nonce: this.nonce(),
-      originChainId: inputChain,
-      fillDeadline: currentTime + this.fillDeadline,
-      expires: currentTime + this.expiry,
-      inputOracle,
-      inputs,
-      outputs: buildMandateOutputs({
-        exclusiveFor: this.exclusiveFor,
-        outputTokens: this.outputs,
-        getOracle: this.getOracle,
-        verifier: this.verifier,
-        sameChain: this.isSameChain(),
-        recipient: this.user,
-        currentTime,
-      }),
-    };
+    switch (firstInput.token.chainNamespace) {
+      case "solana": {
+        if (this.inputs.length > 1) {
+          throw new Error("SolanaStandardOrder only supports a single input");
+        }
+        const solanaInputOracle = this.getOracle(this.verifier, inputChain);
+        if (!solanaInputOracle)
+          throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`);
+        const solanaStandardOrder: StandardSolana = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: solanaInputOracle,
+          inputs: [[BigInt(firstInput.token.address), firstInput.amount]],
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            sameChain: this.isSameChain(),
+            recipient,
+            currentTime,
+          }),
+        };
+        return new StandardSolanaIntent(inputSettlerForSolana(inputChain), solanaStandardOrder);
+      }
+      default: {
+        const inputs: [bigint, bigint][] = this.inputs.map(({ token, amount }) => [
+          this.lock.type === "compact"
+            ? toId(true, this.lock.resetPeriod, this.lock.allocatorId, token.address)
+            : BigInt(token.address),
+          amount,
+        ]);
+        let evmInputOracle: `0x${string}`;
 
-    return new StandardOrderIntent(
-      inputSettlerForLock(this.lock, false),
-      order,
-    );
+        if (this.isSameChain()) {
+          evmInputOracle = COIN_FILLER;
+        } else {
+          const oracle = this.getOracle(this.verifier, inputChain);
+          if (!oracle)
+            throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`);
+          evmInputOracle = oracle;
+        }
+        
+        const order: StandardEVM = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: evmInputOracle,
+          inputs,
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            sameChain: this.isSameChain(),
+            recipient,
+            currentTime,
+          }),
+        };
+        return new StandardEVMIntent(inputSettlerForLock(this.lock, false), order);
+      }
+    }
   }
 
   multichain() {
@@ -133,11 +169,10 @@ export class Intent {
       throw new Error("Intent requires at least one input token");
     }
     const currentTime = Math.floor(Date.now() / 1000);
-    const inputOracle = this.getOracle(
-      this.verifier,
-      firstInput.token.chainId,
-    )!;
-
+    const inputOracle = this.getOracle(this.verifier, firstInput.token.chainId);
+    if (!inputOracle)
+      throw new Error(`No oracle configured for verifier "${this.verifier}" on chain ${firstInput.token.chainId}`);
+    const recipient = this.outputRecipient ? addressToBytes32(this.outputRecipient) : addressToBytes32(this.walletUser);
     const inputs: { chainId: bigint; inputs: [bigint, bigint][] }[] = [
       ...new Set(this.inputs.map(({ token }) => token.chainId)),
     ].map((chain) => {
@@ -161,7 +196,7 @@ export class Intent {
     });
 
     const order: MultichainOrder = {
-      user: this.user,
+      user: this.walletUser,
       nonce: this.nonce(),
       fillDeadline: currentTime + this.fillDeadline,
       expires: currentTime + this.expiry,
@@ -172,7 +207,7 @@ export class Intent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         sameChain: false,
-        recipient: this.user,
+        recipient,
         currentTime,
       }),
       inputs,
@@ -181,7 +216,7 @@ export class Intent {
     return new MultichainOrderIntent(
       inputSettlerForLock(this.lock, true),
       order,
-      this.lock,
+      this.lock as EscrowLock | CompactLock,
     );
   }
 

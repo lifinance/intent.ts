@@ -1,7 +1,13 @@
 export { Intent } from "./create";
-export { isStandardOrder, orderToIntent } from "./fromOrder";
-export { StandardOrderIntent, computeStandardOrderId } from "./standard";
-export type { OrderIntentCommon } from "./types";
+export {
+  StandardSolanaIntent,
+  borshEncodeSolanaOrder,
+  computeStandardSolanaId,
+  standardOrderToSolanaOrder,
+} from "./solanaStandard";
+export { isStandardOrder, isStandardSolana, orderToIntent } from "./fromOrder";
+export { StandardEVMIntent, computeStandardEVMId } from "./standard";
+export type { OrderIntentCommon, EvmOrderIntent, SolanaOrderIntent } from "./types";
 export {
   MultichainOrderIntent,
   hashMultichainInputs,

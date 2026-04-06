@@ -22,6 +22,12 @@ describe("convert helpers", () => {
     expect(bytes32ToAddress(bytes)).toBe(address);
   });
 
+  it("passes through an already-padded bytes32 address unchanged", () => {
+    const bytes32 =
+      "0x0000000000000000000000001111111111111111111111111111111111111111" as const;
+    expect(addressToBytes32(bytes32)).toBe(bytes32);
+  });
+
   it("throws for invalid address and bytes lengths", () => {
     expect(() => addressToBytes32("0x1234" as `0x${string}`)).toThrow(
       "Invalid address length",

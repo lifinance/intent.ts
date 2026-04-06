@@ -3,6 +3,8 @@ import {
   COIN_FILLER,
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  SOLANA_DEVNET_CHAIN_ID,
+  SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 } from "../constants";
 import type { IntentDeps } from "../deps";
 import {
@@ -20,7 +22,8 @@ import type {
 } from "../types";
 import { Intent } from "./create";
 import { MultichainOrderIntent } from "./multichain";
-import { StandardOrderIntent } from "./standard";
+import { StandardEVMIntent } from "./standard";
+import { StandardSolanaIntent } from "./solanaStandard";
 
 const originalDateNow = Date.now;
 const originalMathRandom = Math.random;
@@ -41,6 +44,7 @@ const ETH_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_ETHEREUM,
   decimals: 6,
+  chainNamespace: "eip155",
 };
 
 const ETH_WETH: CoreToken = {
@@ -48,6 +52,7 @@ const ETH_WETH: CoreToken = {
   name: "weth",
   chainId: CHAIN_ID_ETHEREUM,
   decimals: 18,
+  chainNamespace: "eip155",
 };
 
 const ARB_USDC: CoreToken = {
@@ -55,6 +60,7 @@ const ARB_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_ARBITRUM,
   decimals: 6,
+  chainNamespace: "eip155",
 };
 
 const BASE_USDC: CoreToken = {
@@ -62,6 +68,7 @@ const BASE_USDC: CoreToken = {
   name: "usdc",
   chainId: CHAIN_ID_BASE,
   decimals: 6,
+  chainNamespace: "eip155",
 };
 
 function ctx(token: CoreToken, amount: bigint): TokenContext {
@@ -124,7 +131,7 @@ describe("Intent", () => {
     const single = intent.singlechain();
     const order = single.asOrder();
 
-    expect(single).toBeInstanceOf(StandardOrderIntent);
+    expect(single).toBeInstanceOf(StandardEVMIntent);
     expect(single.inputSettler).toBe(INPUT_SETTLER_ESCROW_LIFI);
     expect(order.inputOracle).toBe(COIN_FILLER);
     expect(order.fillDeadline).toBe(TEST_NOW_SECONDS + 2 * 60 * 60);
@@ -206,7 +213,65 @@ describe("Intent", () => {
       intentDeps,
     ).order();
 
-    expect(single).toBeInstanceOf(StandardOrderIntent);
+    expect(single).toBeInstanceOf(StandardEVMIntent);
     expect(multi).toBeInstanceOf(MultichainOrderIntent);
+  });
+
+  describe("Solana singlechain", () => {
+    const SOLANA_DEVNET_ORACLE =
+      "0x0000003E06000007A224AeE90052fA6bb46d43C9" as const;
+
+    const solanaIntentDeps: IntentDeps = {
+      getOracle(verifier, chainId) {
+        if (verifier !== "polymer") return undefined;
+        if (chainId === SOLANA_DEVNET_CHAIN_ID) return SOLANA_DEVNET_ORACLE;
+        return [CHAIN_ID_ETHEREUM, CHAIN_ID_ARBITRUM, CHAIN_ID_BASE].includes(chainId)
+          ? TEST_POLYMER_ORACLE
+          : undefined;
+      },
+    };
+
+    const SOLANA_USDC: CoreToken = {
+      address: "0xab11111111111111111111111111111111111111111111111111111111111111",
+      name: "USDC",
+      chainId: SOLANA_DEVNET_CHAIN_ID,
+      decimals: 6,
+      chainNamespace: "solana",
+    };
+
+    it("returns SolanaStandardEVMIntent for a solana input token", () => {
+      const intent = new Intent(
+        makeEscrowOptions([ctx(SOLANA_USDC, 1_000_000n)], [ctx(ARB_USDC, 1_000_000n)]),
+        solanaIntentDeps,
+      );
+      const result = intent.singlechain();
+
+      expect(result).toBeInstanceOf(StandardSolanaIntent);
+      expect(result.inputSettler).toBe(SOLANA_DEVNET_INPUT_SETTLER_ESCROW);
+    });
+
+    it("sets inputOracle from the oracle resolver", () => {
+      const intent = new Intent(
+        makeEscrowOptions([ctx(SOLANA_USDC, 1_000_000n)], [ctx(ARB_USDC, 1_000_000n)]),
+        solanaIntentDeps,
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.inputOracle).toBe(SOLANA_DEVNET_ORACLE);
+    });
+
+    it("throws when more than one solana input is provided", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1n), ctx(SOLANA_USDC, 2n)],
+          [ctx(ARB_USDC, 1n)],
+        ),
+        solanaIntentDeps,
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        "SolanaStandardOrder only supports a single input",
+      );
+    });
   });
 });

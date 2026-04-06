@@ -20,7 +20,7 @@ import {
   CHAIN_ID_ETHEREUM,
   makeMandateOutput,
   makeMultichainOrder,
-  makeStandardOrder,
+  makeStandardEvm,
 } from "../tests/orderFixtures";
 
 const output = makeMandateOutput(CHAIN_ID_ARBITRUM, 1n, { context: "0x00" });
@@ -47,7 +47,7 @@ const validationDeps: OrderContainerValidationDeps = {
 
 describe("validation", () => {
   it("rejects orders where fillDeadline is later than expires", () => {
-    const invalidTiming = makeStandardOrder({
+    const invalidTiming = makeStandardEvm({
       expires: 2_000_000_000,
       fillDeadline: 2_000_000_001,
     });
@@ -60,7 +60,7 @@ describe("validation", () => {
   });
 
   it("accepts orders with multiple outputs", () => {
-    const multiOutput = makeStandardOrder({
+    const multiOutput = makeStandardEvm({
       outputs: [output, { ...output, amount: 2n }],
     });
     expect(validateOrder({ order: multiOutput, deps: validationDeps })).toBe(
@@ -69,7 +69,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with unknown source oracle", () => {
-    const invalidOracle = makeStandardOrder({
+    const invalidOracle = makeStandardEvm({
       inputOracle: "0x0000000000000000000000000000000000000001",
     });
     const result = validateOrderWithReason({
@@ -81,7 +81,7 @@ describe("validation", () => {
   });
 
   it("accepts same-chain intents with COIN_FILLER as inputOracle", () => {
-    const sameChainCoinFiller = makeStandardOrder({
+    const sameChainCoinFiller = makeStandardEvm({
       inputOracle: COIN_FILLER,
       outputs: [{ ...output, chainId: CHAIN_ID_ETHEREUM }],
     });
@@ -91,7 +91,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with empty inputs", () => {
-    const emptyInputs = makeStandardOrder({ inputs: [] });
+    const emptyInputs = makeStandardEvm({ inputs: [] });
     const result = validateOrderWithReason({
       order: emptyInputs,
       deps: validationDeps,
@@ -101,7 +101,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with non-positive input amount", () => {
-    const invalidInputAmount = makeStandardOrder({ inputs: [[1n, 0n]] });
+    const invalidInputAmount = makeStandardEvm({ inputs: [[1n, 0n]] });
     const result = validateOrderWithReason({
       order: invalidInputAmount,
       deps: validationDeps,
@@ -111,7 +111,7 @@ describe("validation", () => {
   });
 
   it("accepts orders with zero output amount", () => {
-    const zeroOutputAmount = makeStandardOrder({
+    const zeroOutputAmount = makeStandardEvm({
       outputs: [{ ...output, amount: 0n }],
     });
     expect(
@@ -120,7 +120,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with negative output amount", () => {
-    const negativeOutputAmount = makeStandardOrder({
+    const negativeOutputAmount = makeStandardEvm({
       outputs: [{ ...output, amount: -1n }],
     });
     const result = validateOrderWithReason({
@@ -132,7 +132,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with unknown output chain", () => {
-    const badOutputChain = makeStandardOrder({
+    const badOutputChain = makeStandardEvm({
       outputs: [{ ...output, chainId: 999999999n }],
     });
     const result = validateOrderWithReason({
@@ -144,7 +144,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with non-whitelisted output oracle", () => {
-    const badOutputOracle = makeStandardOrder({
+    const badOutputOracle = makeStandardEvm({
       outputs: [{ ...output, oracle: b32("a") }],
     });
     const result = validateOrderWithReason({
@@ -156,7 +156,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with non-whitelisted output settler", () => {
-    const badOutputSettler = makeStandardOrder({
+    const badOutputSettler = makeStandardEvm({
       outputs: [{ ...output, settler: b32("b") }],
     });
     const result = validateOrderWithReason({
@@ -168,7 +168,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with zero token", () => {
-    const invalidToken = makeStandardOrder({
+    const invalidToken = makeStandardEvm({
       outputs: [{ ...output, token: b32("0") }],
     });
     const result = validateOrderWithReason({
@@ -180,7 +180,7 @@ describe("validation", () => {
   });
 
   it("rejects orders with zero recipient", () => {
-    const invalidRecipient = makeStandardOrder({
+    const invalidRecipient = makeStandardEvm({
       outputs: [{ ...output, recipient: b32("0") }],
     });
     const result = validateOrderWithReason({
@@ -194,7 +194,7 @@ describe("validation", () => {
   it("returns standard-order validation result from container validator", () => {
     const invalidStandardContainer: OrderContainer = {
       inputSettler: INPUT_SETTLER_ESCROW_LIFI,
-      order: makeStandardOrder({
+      order: makeStandardEvm({
         inputOracle: "0x0000000000000000000000000000000000000001",
       }),
       sponsorSignature: { type: "None", payload: "0x" },
@@ -227,7 +227,7 @@ describe("validation", () => {
   it("treats compact intents as valid in container validator (TODO path)", () => {
     const compactContainer: OrderContainer = {
       inputSettler: INPUT_SETTLER_COMPACT_LIFI,
-      order: makeStandardOrder({
+      order: makeStandardEvm({
         inputOracle: "0x0000000000000000000000000000000000000001",
       }),
       sponsorSignature: { type: "None", payload: "0x" },
