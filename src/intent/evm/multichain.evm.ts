@@ -161,9 +161,7 @@ export function computeMultichainCompactOrderId(
   );
 }
 
-export class MultichainOrderIntent
-  implements EvmOrderIntent<MultichainOrder>
-{
+export class MultichainOrderIntent implements EvmOrderIntent<MultichainOrder> {
   lock: EscrowLock | CompactLock;
   inputSettler: `0x${string}`;
   private readonly order: MultichainOrder;

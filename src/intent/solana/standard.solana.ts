@@ -51,7 +51,8 @@ const standardOrderSchema = {
 
 // Pad a hex value to 32 bytes for Borsh encoding.
 const toBytes32 = (hex: `0x${string}`) => hexToBytes(pad(hex, { size: 32 }));
-const bigintToBytes32 = (value: bigint) => hexToBytes(numberToHex(value, { size: 32 }));
+const bigintToBytes32 = (value: bigint) =>
+  hexToBytes(numberToHex(value, { size: 32 }));
 
 function toBorshOutput(o: MandateOutput) {
   return {
@@ -70,9 +71,7 @@ function toBorshOutput(o: MandateOutput) {
 
 const U32_MAX = 4_294_967_295;
 
-export function borshEncodeSolanaOrder(
-  order: StandardSolana,
-): Uint8Array {
+export function borshEncodeSolanaOrder(order: StandardSolana): Uint8Array {
   if (order.expires > U32_MAX)
     throw new Error(`expires exceeds u32 max: ${order.expires}`);
   if (order.fillDeadline > U32_MAX)
@@ -95,9 +94,7 @@ export function borshEncodeSolanaOrder(
   });
 }
 
-export function computeStandardSolanaId(
-  order: StandardSolana,
-): `0x${string}` {
+export function computeStandardSolanaId(order: StandardSolana): `0x${string}` {
   return keccak256(borshEncodeSolanaOrder(order));
 }
 
@@ -126,7 +123,6 @@ export function standardOrderToSolanaOrder(
     outputs: order.outputs,
   };
 }
-
 
 // -- Intent class ----------------------------------------------------------- //
 

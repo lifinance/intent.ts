@@ -39,10 +39,7 @@ describe("standard intent", () => {
       const [firstOutput] = baseOrder.outputs;
       if (!firstInput || !firstOutput)
         throw new Error("Expected standard order inputs and outputs");
-      const baseId = computeStandardEVMId(
-        INPUT_SETTLER_ESCROW_LIFI,
-        baseOrder,
-      );
+      const baseId = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, baseOrder);
 
       const mutations: {
         name: string;
@@ -139,9 +136,7 @@ describe("standard intent", () => {
       const id2 = intent.orderId();
 
       expect(id1).toBe(id2);
-      expect(id1).toBe(
-        computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order),
-      );
+      expect(id1).toBe(computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order));
       expectBytes32Hex(id1);
     });
 
