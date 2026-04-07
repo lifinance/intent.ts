@@ -5,7 +5,7 @@ export {
   computeStandardSolanaId,
   standardOrderToSolanaOrder,
 } from "./solana/standard.solana";
-export { orderToIntent } from "./fromOrder";
+export { orderToIntent, isStandardOrder } from "./fromOrder";
 export { StandardEVMIntent, computeStandardEVMId } from "./evm/standard.evm";
 export type { OrderIntent } from "./types";
 export {
