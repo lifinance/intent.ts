@@ -10,6 +10,12 @@ import { StandardSolanaIntent } from "./solana/standard.solana";
 import { asMultichainIntent } from "./multichain";
 import { asStandardIntent } from "./standard";
 
+export function isStandardOrder(
+  order: StandardOrder | MultichainOrder,
+): order is StandardOrder {
+  return "originChainId" in order;
+}
+
 type OrderToIntentOptions =
   | { namespace: "solana"; inputSettler: `0x${string}`; order: StandardOrder }
   | {
