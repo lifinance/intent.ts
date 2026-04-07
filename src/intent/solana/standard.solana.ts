@@ -131,7 +131,7 @@ export class StandardSolanaIntent implements OrderIntent<StandardSolana> {
     return this.order;
   }
 
-  inputChains(): bigint[] {
+  inputChains(): [bigint] {
     return [this.order.originChainId];
   }
 
