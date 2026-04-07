@@ -1,26 +1,20 @@
-import type { MultichainOrder, StandardSolana, StandardEVM } from "../types/index";
+import type {
+  MultichainOrder,
+  StandardSolana,
+  StandardEVM,
+} from "../types/index";
 
-export interface OrderIntentCommon<
+export interface OrderIntent<
   TOrder extends StandardEVM | StandardSolana | MultichainOrder =
     | StandardEVM
     | StandardSolana
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;
+  namespace: NAMESPACES;
   asOrder(): TOrder;
+  inputChains(): bigint[];
   orderId(): `0x${string}`;
 }
 
-export interface EvmOrderIntent<
-  TOrder extends StandardEVM | MultichainOrder =
-    | StandardEVM
-    | MultichainOrder,
-> extends OrderIntentCommon<TOrder> {
-  compactClaimHash(): `0x${string}`;
-  inputChains(): bigint[];
-}
-
-export interface SolanaOrderIntent extends OrderIntentCommon<StandardSolana> {
-  borshEncode(): Uint8Array;
-  inputChain(): bigint;
-}
+export type NAMESPACES = "eip155" | "solana" | "bitcoin";

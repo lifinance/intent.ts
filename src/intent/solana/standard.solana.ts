@@ -1,14 +1,14 @@
 import { hexToBytes, keccak256, numberToHex, pad } from "viem";
-import { serialize } from "borsh";
+import { serialize, type Schema } from "borsh";
 import type {
   MandateOutput,
-  StandardSolana,
   StandardOrder,
-} from "../types/index";
-import type { SolanaOrderIntent } from "./types";
+  StandardSolana,
+} from "../../types/index";
+import type { OrderIntent } from "../types";
 
 // -- Borsh schemas ---------------------------------------------------------- //
-// Mirrors `common::types::StandardOrder` in catalyst-intent-svm.
+// Mirrors `common::types::StandardSolana` in catalyst-intent-svm.
 
 const bytes32 = { array: { type: "u8" as const, len: 32 } };
 
@@ -34,7 +34,7 @@ const mandateInputSchema = {
   },
 };
 
-const standardOrderSchema = {
+const solanaOrderSchema = {
   struct: {
     user: bytes32,
     nonce: "u128" as const,
@@ -51,7 +51,8 @@ const standardOrderSchema = {
 
 // Pad a hex value to 32 bytes for Borsh encoding.
 const toBytes32 = (hex: `0x${string}`) => hexToBytes(pad(hex, { size: 32 }));
-const bigintToBytes32 = (value: bigint) => hexToBytes(numberToHex(value, { size: 32 }));
+const bigintToBytes32 = (value: bigint) =>
+  hexToBytes(numberToHex(value, { size: 32 }));
 
 function toBorshOutput(o: MandateOutput) {
   return {
@@ -70,9 +71,7 @@ function toBorshOutput(o: MandateOutput) {
 
 const U32_MAX = 4_294_967_295;
 
-export function borshEncodeSolanaOrder(
-  order: StandardSolana,
-): Uint8Array {
+export function borshEncodeSolanaOrder(order: StandardSolana): Uint8Array {
   if (order.expires > U32_MAX)
     throw new Error(`expires exceeds u32 max: ${order.expires}`);
   if (order.fillDeadline > U32_MAX)
@@ -80,7 +79,7 @@ export function borshEncodeSolanaOrder(
 
   const [tokenBigInt, inputAmount] = order.inputs[0];
 
-  return serialize(standardOrderSchema, {
+  return serialize(solanaOrderSchema as Schema, {
     user: toBytes32(order.user),
     nonce: BigInt(order.nonce),
     origin_chain_id: BigInt(order.originChainId),
@@ -95,26 +94,15 @@ export function borshEncodeSolanaOrder(
   });
 }
 
-export function computeStandardSolanaId(
-  order: StandardSolana,
-): `0x${string}` {
+export function computeStandardSolanaId(order: StandardSolana): `0x${string}` {
   return keccak256(borshEncodeSolanaOrder(order));
 }
 
-// -- Conversion helpers ----------------------------------------------------- //
-
-/**
- * Converts a `StandardOrder` with a single input into a `StandardSolana`.
- * Use this when the order was constructed via the EVM path but needs to be
- * submitted to the Solana input settler (e.g. for cross-chain reconstruction).
- * Throws if the order contains zero or more than one input.
- */
 export function standardOrderToSolanaOrder(
   order: StandardOrder,
 ): StandardSolana {
-  if (order.inputs.length === 0) throw new Error("No inputs in order");
-  if (order.inputs.length > 1)
-    throw new Error("StandardSolana only supports a single input");
+  if (order.inputs.length !== 1)
+    throw new Error("Standard Solana order takes exactly 1 input");
   return {
     user: order.user,
     nonce: order.nonce,
@@ -127,11 +115,11 @@ export function standardOrderToSolanaOrder(
   };
 }
 
-
 // -- Intent class ----------------------------------------------------------- //
 
-export class StandardSolanaIntent implements SolanaOrderIntent {
+export class StandardSolanaIntent implements OrderIntent<StandardSolana> {
   inputSettler: `0x${string}`;
+  readonly namespace = "solana" as const;
   private readonly order: StandardSolana;
 
   constructor(inputSettler: `0x${string}`, order: StandardSolana) {
@@ -143,8 +131,8 @@ export class StandardSolanaIntent implements SolanaOrderIntent {
     return this.order;
   }
 
-  inputChain(): bigint {
-    return this.order.originChainId;
+  inputChains(): [bigint] {
+    return [this.order.originChainId];
   }
 
   borshEncode(): Uint8Array {

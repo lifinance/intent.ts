@@ -14,8 +14,8 @@ export function encodeOutputs(outputs: MandateOutput[]) {
   );
 }
 
-/** 
- * recipient must be a bytes32-padded address (32 bytes, 0x-prefixed). 
+/**
+ * recipient must be a bytes32-padded address (32 bytes, 0x-prefixed).
  */
 export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
@@ -46,7 +46,7 @@ export function buildMandateOutputs(options: {
 
   let context: `0x${string}` = "0x";
   if (exclusiveFor) {
-    const paddedExclusiveFor: `0x${string}` = `0x${exclusiveFor.replace("0x", "").padStart(64, "0")}`;
+    const paddedExclusiveFor = addressToBytes32(exclusiveFor);
     context = encodePacked(
       ["bytes1", "bytes32", "uint32"],
       ["0xe0", paddedExclusiveFor, currentTime + ONE_MINUTE],
@@ -54,20 +54,25 @@ export function buildMandateOutputs(options: {
   }
 
   return outputTokens.map(({ token, amount }) => {
-    const solanaSettler = token.chainNamespace === "solana"
-      ? SOLANA_OUTPUT_SETTLER_PDAS[token.chainId.toString()]
-      : undefined;
-    if (token.chainNamespace === "solana" && !solanaSettler)
-      throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
-    
-    const outputSettler = solanaSettler ?? COIN_FILLER;
+    let outputSettler: `0x${string}`;
+    if (token.chainNamespace === "solana") {
+      const solanaSettler =
+        SOLANA_OUTPUT_SETTLER_PDAS[token.chainId.toString()];
+      if (!solanaSettler)
+        throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
+      outputSettler = solanaSettler;
+    } else {
+      outputSettler = COIN_FILLER;
+    }
     let outputOracle: `0x${string}`;
     if (sameChain) {
       outputOracle = addressToBytes32(outputSettler);
     } else {
       const oracle = getOracle(verifier, token.chainId);
       if (!oracle)
-        throw new Error(`No oracle configured for verifier "${verifier}" on chain ${token.chainId}`);
+        throw new Error(
+          `No oracle configured for verifier "${verifier}" on chain ${token.chainId}`,
+        );
       outputOracle = addressToBytes32(oracle);
     }
     return {

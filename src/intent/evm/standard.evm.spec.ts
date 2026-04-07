@@ -2,12 +2,12 @@ import { describe, expect, it } from "bun:test";
 import {
   INPUT_SETTLER_COMPACT_LIFI,
   INPUT_SETTLER_ESCROW_LIFI,
-} from "../constants";
-import { compactClaimHash as computeCompactClaimHash } from "./compact/claims";
-import { toStandardBatchCompact } from "./compact/conversions";
-import { computeStandardEVMId, StandardEVMIntent } from "./standard";
-import { makeStandardEvm } from "../../tests/orderFixtures";
-import type { StandardOrder } from "../types";
+} from "../../constants";
+import { compactClaimHash as computeCompactClaimHash } from "../compact/claims";
+import { toStandardBatchCompact } from "../compact/conversions";
+import { computeStandardEVMId, StandardEVMIntent } from "./standard.evm";
+import { makeStandardEvm } from "../../../tests/orderFixtures";
+import type { StandardOrder } from "../../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
   expect(value.startsWith("0x")).toBe(true);
@@ -39,10 +39,7 @@ describe("standard intent", () => {
       const [firstOutput] = baseOrder.outputs;
       if (!firstInput || !firstOutput)
         throw new Error("Expected standard order inputs and outputs");
-      const baseId = computeStandardEVMId(
-        INPUT_SETTLER_ESCROW_LIFI,
-        baseOrder,
-      );
+      const baseId = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, baseOrder);
 
       const mutations: {
         name: string;
@@ -139,9 +136,7 @@ describe("standard intent", () => {
       const id2 = intent.orderId();
 
       expect(id1).toBe(id2);
-      expect(id1).toBe(
-        computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order),
-      );
+      expect(id1).toBe(computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order));
       expectBytes32Hex(id1);
     });
 

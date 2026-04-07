@@ -1,69 +1,32 @@
-import { encodePacked, keccak256 } from "viem";
-import { INPUT_SETTLER_COMPACT_LIFI } from "../constants";
-import { compactClaimHash } from "./compact/claims";
-import { toStandardBatchCompact } from "./compact/conversions";
-import { encodeOutputs } from "./helpers/output-encoding";
-import type { BatchCompact, StandardEVM } from "../types/index";
-import type { EvmOrderIntent } from "./types";
+import { StandardEVMIntent } from "./evm/standard.evm";
+import { StandardSolanaIntent } from "./solana/standard.solana";
+import type { StandardOrder, StandardSolana, StandardEVM } from "../types";
+import type { NAMESPACES } from "./types";
 
-export function computeStandardEVMId(
-  inputSettler: `0x${string}`,
-  order: StandardEVM,
-): `0x${string}` {
-  return keccak256(
-    encodePacked(
-      [
-        "uint256",
-        "address",
-        "address",
-        "uint256",
-        "uint32",
-        "uint32",
-        "address",
-        "bytes32",
-        "bytes",
-      ],
-      [
-        order.originChainId,
-        inputSettler,
-        order.user,
-        order.nonce,
-        order.expires,
-        order.fillDeadline,
-        order.inputOracle,
-        keccak256(encodePacked(["uint256[2][]"], [order.inputs])),
-        encodeOutputs(order.outputs),
-      ],
-    ),
-  );
-}
+type StandardIntentReturn<N extends NAMESPACES> = N extends "solana"
+  ? StandardSolanaIntent
+  : N extends "eip155"
+    ? StandardEVMIntent
+    : never;
 
-export class StandardEVMIntent implements EvmOrderIntent<StandardEVM> {
+export function asStandardIntent<N extends NAMESPACES>(arg: {
+  namespace: N;
+  order: StandardOrder;
   inputSettler: `0x${string}`;
-  private readonly order: StandardEVM;
+}): StandardIntentReturn<N> {
+  const { namespace, order, inputSettler } = arg;
 
-  constructor(inputSetter: `0x${string}`, order: StandardEVM) {
-    this.inputSettler = inputSetter;
-    this.order = order;
-  }
+  if (namespace === "solana")
+    return new StandardSolanaIntent(
+      inputSettler,
+      order as StandardSolana,
+    ) as StandardIntentReturn<N>;
 
-  asOrder(): StandardEVM {
-    return this.order;
-  }
+  if (namespace === "eip155")
+    return new StandardEVMIntent(
+      inputSettler,
+      order as StandardEVM,
+    ) as StandardIntentReturn<N>;
 
-  asBatchCompact(): BatchCompact {
-    return toStandardBatchCompact(this.order, INPUT_SETTLER_COMPACT_LIFI);
-  }
-
-  inputChains(): bigint[] {
-    return [this.order.originChainId];
-  }
-
-  orderId(): `0x${string}` {
-    return computeStandardEVMId(this.inputSettler, this.order);
-  }
-
-  compactClaimHash(): `0x${string}` {
-    return compactClaimHash(this.asBatchCompact());
-  }
+  throw new Error("Namespace not found");
 }

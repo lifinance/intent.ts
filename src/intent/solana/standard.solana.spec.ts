@@ -1,20 +1,20 @@
 import { describe, expect, it } from "bun:test";
 
-import { SOLANA_DEVNET_INPUT_SETTLER_ESCROW } from "../constants";
+import { SOLANA_DEVNET_INPUT_SETTLER_ESCROW } from "../../constants";
 import {
   borshEncodeSolanaOrder,
   computeStandardSolanaId,
   StandardSolanaIntent,
   standardOrderToSolanaOrder,
-} from "./solanaStandard";
+} from "./standard.solana.ts";
 import {
   b32,
   makeMandateOutput,
   makeStandardSolana,
   makeStandardEvm,
   CHAIN_ID_ARBITRUM,
-} from "../../tests/orderFixtures";
-import type { StandardSolana } from "../types";
+} from "../../../tests/orderFixtures";
+import type { StandardSolana } from "../../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
   expect(value.startsWith("0x")).toBe(true);
@@ -27,16 +27,23 @@ describe("solana standard intent", () => {
 
     it("throws when expires exceeds u32 max", () => {
       const order = makeStandardSolana({ expires: U32_MAX + 1 });
-      expect(() => borshEncodeSolanaOrder(order)).toThrow("expires exceeds u32 max");
+      expect(() => borshEncodeSolanaOrder(order)).toThrow(
+        "expires exceeds u32 max",
+      );
     });
 
     it("throws when fillDeadline exceeds u32 max", () => {
       const order = makeStandardSolana({ fillDeadline: U32_MAX + 1 });
-      expect(() => borshEncodeSolanaOrder(order)).toThrow("fillDeadline exceeds u32 max");
+      expect(() => borshEncodeSolanaOrder(order)).toThrow(
+        "fillDeadline exceeds u32 max",
+      );
     });
 
     it("accepts values at the u32 boundary", () => {
-      const order = makeStandardSolana({ expires: U32_MAX, fillDeadline: U32_MAX });
+      const order = makeStandardSolana({
+        expires: U32_MAX,
+        fillDeadline: U32_MAX,
+      });
       expect(() => borshEncodeSolanaOrder(order)).not.toThrow();
     });
   });
@@ -204,14 +211,21 @@ describe("solana standard intent", () => {
     it("throws when inputs is empty", () => {
       const std = makeStandardEvm({ inputs: [] });
 
-      expect(() => standardOrderToSolanaOrder(std)).toThrow("No inputs in order");
+      expect(() => standardOrderToSolanaOrder(std)).toThrow(
+        "Standard Solana order takes exactly 1 input",
+      );
     });
 
     it("throws when there are multiple inputs", () => {
-      const std = makeStandardEvm({ inputs: [[1n, 1n], [2n, 2n]] });
+      const std = makeStandardEvm({
+        inputs: [
+          [1n, 1n],
+          [2n, 2n],
+        ],
+      });
 
       expect(() => standardOrderToSolanaOrder(std)).toThrow(
-        "StandardSolana only supports a single input",
+        "Standard Solana order takes exactly 1 input",
       );
     });
   });
@@ -234,7 +248,7 @@ describe("solana standard intent", () => {
         order,
       );
 
-      expect(intent.inputChain()).toEqual(order.originChainId);
+      expect(intent.inputChains()).toEqual([order.originChainId]);
     });
 
     it("computes a deterministic orderId from its current state", () => {

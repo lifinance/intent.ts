@@ -1,7 +1,7 @@
 import type { MandateOutput } from "./mandate";
 import type { NoSignature, Signature } from "./signature";
 
-export type StandardEVM = {
+export type EVMOrder = {
   user: `0x${string}`;
   nonce: bigint;
   originChainId: bigint;
@@ -12,7 +12,7 @@ export type StandardEVM = {
   outputs: MandateOutput[];
 };
 
-export type StandardSolana = {
+export type SolanaOrder = {
   user: `0x${string}`;
   nonce: bigint;
   originChainId: bigint;
@@ -23,7 +23,10 @@ export type StandardSolana = {
   outputs: MandateOutput[];
 };
 
-export type StandardOrder = StandardEVM | StandardSolana;
+export type StandardOrder = SolanaOrder | EVMOrder;
+
+export type StandardEVM = EVMOrder;
+export type StandardSolana = SolanaOrder;
 
 export type MultichainOrderComponent = {
   user: `0x${string}`;

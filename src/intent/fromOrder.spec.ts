@@ -7,10 +7,10 @@ import {
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 } from "../constants";
 import { ResetPeriod } from "../compact/idLib";
-import { isStandardSolana, orderToIntent } from ".";
-import { MultichainOrderIntent } from "./multichain";
-import { StandardEVMIntent } from "./standard";
-import { StandardSolanaIntent } from "./solanaStandard";
+import { orderToIntent } from ".";
+import { MultichainOrderIntent } from "./evm/multichain.evm";
+import { StandardEVMIntent } from "./evm/standard.evm";
+import { StandardSolanaIntent } from "./solana/standard.solana";
 import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
@@ -24,6 +24,7 @@ describe("intent core split", () => {
       originChainId: CHAIN_ID_ETHEREUM,
     });
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: INPUT_SETTLER_ESCROW_LIFI,
       order,
     });
@@ -35,6 +36,7 @@ describe("intent core split", () => {
 
   it("hydrates a multichain order and computes one shared orderId", () => {
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: MULTICHAIN_INPUT_SETTLER_ESCROW,
       order: makeMultichainOrder(),
     });
@@ -49,6 +51,7 @@ describe("intent core split", () => {
 
   it("infers compact lock for compact settlers", () => {
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: MULTICHAIN_INPUT_SETTLER_COMPACT,
       order: makeMultichainOrder(),
     });
@@ -68,6 +71,7 @@ describe("intent core split", () => {
     };
 
     const intent = orderToIntent({
+      namespace: "eip155",
       inputSettler: INPUT_SETTLER_COMPACT_LIFI,
       order: makeMultichainOrder(),
       lock: explicitLock,
@@ -76,15 +80,10 @@ describe("intent core split", () => {
     expect(intent.lock).toEqual(explicitLock);
   });
 
-  it("isStandardSolana returns true only for solana orders", () => {
-    expect(isStandardSolana(makeStandardSolana())).toBe(true);
-    expect(isStandardSolana(makeStandardEvm())).toBe(false);
-    expect(isStandardSolana(makeMultichainOrder())).toBe(false);
-  });
-
   it("hydrates a solana order into StandardSolanaIntent", () => {
     const order = makeStandardSolana();
     const intent = orderToIntent({
+      namespace: "solana",
       inputSettler: SOLANA_DEVNET_INPUT_SETTLER_ESCROW!,
       order,
     });
