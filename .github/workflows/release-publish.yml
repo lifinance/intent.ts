@@ -72,5 +72,4 @@ jobs:
           fi
           npm publish --access public --provenance ${publish_tag}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
