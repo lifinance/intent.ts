@@ -23,10 +23,10 @@ export const SOLANA_MAINNET_CHAIN_ID = 1151111081099710n;
 export const SOLANA_TESTNET_CHAIN_ID = 1151111081099711n;
 export const SOLANA_DEVNET_CHAIN_ID = 1151111081099712n;
 
-// TODO: fill in mainnet and testnet input settler programs once deployed.
 // Do NOT use these constants directly — always go through
 // `inputSettlerForSolana(chainId)` which throws for undeployed networks.
-const SOLANA_MAINNET_INPUT_SETTLER_ESCROW = undefined;
+export const SOLANA_MAINNET_INPUT_SETTLER_ESCROW =
+  "0xabca5a59b56c25b58e08ebc07d20aa570bca69d189c76bbfc0bbf83eee38c7ba" as const;
 const SOLANA_TESTNET_INPUT_SETTLER_ESCROW = undefined;
 export const SOLANA_DEVNET_INPUT_SETTLER_ESCROW =
   "0x4186c46d62fb033aace3a262def7efbbef0591b8e98732bcd62edbbc0916da57" as const;
@@ -37,10 +37,11 @@ export const SOLANA_INPUT_SETTLER_PROGRAMS: Record<string, `0x${string}` | undef
   [SOLANA_DEVNET_CHAIN_ID.toString()]: SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
 };
 
-// TODO: fill in mainnet and testnet output settler PDAs once deployed.
 // Do NOT use these constants directly — always go through
 // `SOLANA_OUTPUT_SETTLER_PDAS[chainId]` which is guarded in buildMandateOutputs.
-const SOLANA_MAINNET_OUTPUT_SETTLER_PDA = undefined;
+// Mainnet output settler program: 0x142f560983db838c0e95fcc4f345050ce9888822c45c34e6b75efffeb5e0a961
+export const SOLANA_MAINNET_OUTPUT_SETTLER_PDA =
+  "0x0c0ddf0a0060d304aacd6f96da3802cd95fb0942ce38d51ff6ce6d65d25d4183" as const;
 const SOLANA_TESTNET_OUTPUT_SETTLER_PDA = undefined;
 export const SOLANA_DEVNET_OUTPUT_SETTLER_PDA =
   "0xabb04f05c412a4892f8c93efa4eda9f360ba8b5c8342bed51207c7a4fdd036d6" as const;

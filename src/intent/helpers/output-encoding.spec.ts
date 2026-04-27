@@ -5,6 +5,7 @@ import {
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_OUTPUT_SETTLER_PDA,
   SOLANA_MAINNET_CHAIN_ID,
+  SOLANA_MAINNET_OUTPUT_SETTLER_PDA,
 } from "../../constants";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { TokenContext } from "../../types";
@@ -164,8 +165,8 @@ describe("output encoding helpers", () => {
     expect(first.chainId).toBe(SOLANA_DEVNET_CHAIN_ID);
   });
 
-  it("throws for unsupported solana chain id in output tokens", () => {
-    const unsupportedSolanaTokens: TokenContext[] = [
+  it("uses solana output settler PDA for solana mainnet output tokens", () => {
+    const solanaMainnetTokens: TokenContext[] = [
       {
         token: {
           address: "0xab11111111111111111111111111111111111111111111111111111111111111",
@@ -178,18 +179,21 @@ describe("output encoding helpers", () => {
       },
     ];
 
-    expect(() =>
-      buildMandateOutputs({
-        outputTokens: unsupportedSolanaTokens,
-        getOracle() {
-          return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
-        },
-        verifier: "polymer",
-        sameChain: false,
-        recipient: "0x0000000000000000000000001111111111111111111111111111111111111111",
-        currentTime: 1_700_000_000,
-      }),
-    ).toThrow(`Unsupported Solana chain id: ${SOLANA_MAINNET_CHAIN_ID}`);
+    const output = buildMandateOutputs({
+      outputTokens: solanaMainnetTokens,
+      getOracle() {
+        return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+      },
+      verifier: "polymer",
+      sameChain: false,
+      recipient: "0x0000000000000000000000001111111111111111111111111111111111111111",
+      currentTime: 1_700_000_000,
+    });
+    const [first] = output;
+    if (!first) throw new Error("Expected one output");
+
+    expect(first.settler).toBe(addressToBytes32(SOLANA_MAINNET_OUTPUT_SETTLER_PDA!));
+    expect(first.chainId).toBe(SOLANA_MAINNET_CHAIN_ID);
   });
 
   it("rejects malformed exclusiveFor addresses", () => {
