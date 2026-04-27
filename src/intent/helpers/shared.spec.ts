@@ -6,6 +6,7 @@ import {
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
   SOLANA_MAINNET_CHAIN_ID,
+  SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
   SOLANA_TESTNET_CHAIN_ID,
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
@@ -56,8 +57,8 @@ describe("intent shared helpers", () => {
   });
 
   it("maps solana chain id to the expected input settler", () => {
-    expect(() => inputSettlerForSolana(SOLANA_MAINNET_CHAIN_ID)).toThrow(
-      `Unsupported Solana chain id: ${SOLANA_MAINNET_CHAIN_ID}`
+    expect(inputSettlerForSolana(SOLANA_MAINNET_CHAIN_ID)).toBe(
+      SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
     );
     expect(() => inputSettlerForSolana(SOLANA_TESTNET_CHAIN_ID)).toThrow(
       `Unsupported Solana chain id: ${SOLANA_TESTNET_CHAIN_ID}`
