@@ -22,7 +22,7 @@ jobs:
             exit 1
           fi
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         env:
@@ -46,11 +46,11 @@ jobs:
             echo "Invalid release tag format: ${GITHUB_REF_NAME}"
             exit 1
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: lts/*
           registry-url: https://registry.npmjs.org
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
