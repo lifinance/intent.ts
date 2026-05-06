@@ -4,7 +4,7 @@ import { compactClaimHash } from "../compact/claims";
 import { toStandardBatchCompact } from "../compact/conversions";
 import { encodeOutputs } from "../helpers/output-encoding";
 import type { BatchCompact, StandardEVM } from "../../types/index";
-import type { OrderIntent } from "../types";
+import type { OrderIntent, NAMESPACES } from "../types";
 
 export function computeStandardEVMId(
   inputSettler: `0x${string}`,
@@ -42,11 +42,16 @@ export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   inputSettler: `0x${string}`;
   private readonly order: StandardEVM;
 
-  readonly namespace = "eip155";
+  readonly namespace: NAMESPACES;
 
-  constructor(inputSettler: `0x${string}`, order: StandardEVM) {
+  constructor(
+    inputSettler: `0x${string}`,
+    order: StandardEVM,
+    namespace: NAMESPACES = "eip155",
+  ) {
     this.inputSettler = inputSettler;
     this.order = order;
+    this.namespace = namespace;
   }
 
   asOrder(): StandardEVM {
@@ -54,6 +59,11 @@ export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   }
 
   asBatchCompact(): BatchCompact {
+    if (this.namespace !== "eip155") {
+      throw new Error(
+        `asBatchCompact is not supported for namespace "${this.namespace}"`,
+      );
+    }
     return toStandardBatchCompact(this.order, INPUT_SETTLER_COMPACT_LIFI);
   }
 
@@ -66,6 +76,11 @@ export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   }
 
   compactClaimHash(): `0x${string}` {
+    if (this.namespace !== "eip155") {
+      throw new Error(
+        `compactClaimHash is not supported for namespace "${this.namespace}"`,
+      );
+    }
     return compactClaimHash(this.asBatchCompact());
   }
 }

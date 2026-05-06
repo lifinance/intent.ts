@@ -5,6 +5,8 @@ import {
   MULTICHAIN_INPUT_SETTLER_ESCROW,
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+  TRON_MAINNET_CHAIN_ID,
+  TRON_MAINNET_INPUT_SETTLER,
 } from "../constants";
 import type { IntentDeps } from "../deps";
 import {
@@ -281,6 +283,81 @@ describe("Intent", () => {
       expect(() => intent.singlechain()).toThrow(
         "SolanaStandardOrder only supports a single input",
       );
+    });
+  });
+
+  describe("Tron singlechain", () => {
+    const TRON_ORACLE = "0xfa5fabd73c86e1822fda06418c332800c0d7d73b" as const;
+
+    const tronIntentDeps: IntentDeps = {
+      getOracle(verifier, chainId) {
+        if (verifier !== "polymer") return undefined;
+        if (chainId === TRON_MAINNET_CHAIN_ID) return TRON_ORACLE;
+        return [CHAIN_ID_ETHEREUM, CHAIN_ID_ARBITRUM, CHAIN_ID_BASE].includes(
+          chainId,
+        )
+          ? TEST_POLYMER_ORACLE
+          : undefined;
+      },
+    };
+
+    const TRON_USDC: CoreToken = {
+      address: "0xab11111111111111111111111111111111111111",
+      name: "USDC",
+      chainId: TRON_MAINNET_CHAIN_ID,
+      decimals: 6,
+      chainNamespace: "tron",
+    };
+
+    it("returns StandardEVMIntent with tron namespace for a tron input token", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(TRON_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
+        tronIntentDeps,
+      );
+      const result = intent.singlechain();
+
+      expect(result).toBeInstanceOf(StandardEVMIntent);
+      expect(result.namespace).toBe("tron");
+      expect(result.inputSettler).toBe(TRON_MAINNET_INPUT_SETTLER);
+    });
+
+    it("sets inputOracle from the oracle resolver", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(TRON_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
+        tronIntentDeps,
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.inputOracle).toBe(TRON_ORACLE);
+    });
+
+    it("supports multiple tron inputs", () => {
+      const TRON_WTRX: CoreToken = {
+        address: "0xcd22222222222222222222222222222222222222",
+        name: "WTRX",
+        chainId: TRON_MAINNET_CHAIN_ID,
+        decimals: 6,
+        chainNamespace: "tron",
+      };
+
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(TRON_USDC, 1n), ctx(TRON_WTRX, 2n)],
+          [ctx(ARB_USDC, 1n)],
+        ),
+        tronIntentDeps,
+      );
+      const result = intent.singlechain();
+
+      expect(result).toBeInstanceOf(StandardEVMIntent);
+      expect(result.namespace).toBe("tron");
+      expect(result.asOrder().inputs.length).toBe(2);
     });
   });
 });

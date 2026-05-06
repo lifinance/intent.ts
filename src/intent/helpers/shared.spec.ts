@@ -10,11 +10,14 @@ import {
   SOLANA_TESTNET_CHAIN_ID,
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+  TRON_MAINNET_CHAIN_ID,
+  TRON_MAINNET_INPUT_SETTLER,
 } from "../../constants";
 import type { CompactLock, EscrowLock } from "../../types";
 import {
   inputSettlerForLock,
   inputSettlerForSolana,
+  inputSettlerForTron,
   ONE_DAY,
   ONE_HOUR,
   ONE_MINUTE,
@@ -61,7 +64,7 @@ describe("intent shared helpers", () => {
       SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
     );
     expect(() => inputSettlerForSolana(SOLANA_TESTNET_CHAIN_ID)).toThrow(
-      `Unsupported Solana chain id: ${SOLANA_TESTNET_CHAIN_ID}`
+      `Unsupported Solana chain id: ${SOLANA_TESTNET_CHAIN_ID}`,
     );
     expect(inputSettlerForSolana(SOLANA_DEVNET_CHAIN_ID)).toBe(
       SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
@@ -71,6 +74,18 @@ describe("intent shared helpers", () => {
   it("throws for unsupported solana chain id", () => {
     expect(() => inputSettlerForSolana(999n)).toThrow(
       "Unsupported Solana chain id",
+    );
+  });
+
+  it("maps tron chain id to the expected input settler", () => {
+    expect(inputSettlerForTron(TRON_MAINNET_CHAIN_ID)).toBe(
+      TRON_MAINNET_INPUT_SETTLER,
+    );
+  });
+
+  it("throws for unsupported tron chain id", () => {
+    expect(() => inputSettlerForTron(999n)).toThrow(
+      "Unsupported Tron chain id",
     );
   });
 });

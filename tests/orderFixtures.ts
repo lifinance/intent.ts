@@ -72,6 +72,24 @@ export function makeStandardSolana(
   };
 }
 
+export const CHAIN_ID_TRON_MAINNET = 728126428n;
+
+export function makeStandardTron(
+  overrides: Partial<StandardEVM> = {},
+): StandardEVM {
+  return {
+    user: TEST_USER,
+    nonce: 1n,
+    originChainId: CHAIN_ID_TRON_MAINNET,
+    expires: TEST_NOW_SECONDS + 1000,
+    fillDeadline: TEST_NOW_SECONDS + 900,
+    inputOracle: TEST_POLYMER_ORACLE,
+    inputs: [[1n, 1_000_000n]],
+    outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
+    ...overrides,
+  };
+}
+
 export function makeMultichainOrder(
   overrides: Partial<MultichainOrder> = {},
 ): MultichainOrder {

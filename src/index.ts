@@ -4,10 +4,6 @@ export * from "./constants";
 export * from "./output";
 export * from "./validation";
 export * from "./helpers/convert";
-export {
-  getInteropableAddress,
-  type InteropableAddress,
-} from "./helpers/interopableAddress";
 export * from "./compact/idLib";
 export * from "./intent/compact/signing";
 export {

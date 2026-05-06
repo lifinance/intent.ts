@@ -17,4 +17,4 @@ export interface OrderIntent<
   orderId(): `0x${string}`;
 }
 
-export type NAMESPACES = "eip155" | "solana" | "bitcoin";
+export type NAMESPACES = "eip155" | "solana" | "bitcoin" | "tron";

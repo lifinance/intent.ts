@@ -3,7 +3,8 @@ import {
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
-  SOLANA_INPUT_SETTLER_PROGRAMS
+  SOLANA_INPUT_SETTLER_PROGRAMS,
+  TRON_INPUT_SETTLER_PROGRAMS,
 } from "../../constants";
 import type { CompactLock, EscrowLock } from "../../types";
 
@@ -19,6 +20,12 @@ export function selectAllBut<T>(arr: T[], index: number): T[] {
 export function inputSettlerForSolana(chainId: bigint): `0x${string}` {
   const settler = SOLANA_INPUT_SETTLER_PROGRAMS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Solana chain id: ${chainId}`);
+  return settler;
+}
+
+export function inputSettlerForTron(chainId: bigint): `0x${string}` {
+  const settler = TRON_INPUT_SETTLER_PROGRAMS[chainId.toString()];
+  if (!settler) throw new Error(`Unsupported Tron chain id: ${chainId}`);
   return settler;
 }
 

@@ -18,6 +18,7 @@ export function isStandardOrder(
 
 type OrderToIntentOptions =
   | { namespace: "solana"; inputSettler: `0x${string}`; order: StandardOrder }
+  | { namespace: "tron"; inputSettler: `0x${string}`; order: StandardOrder }
   | {
       namespace: "eip155";
       inputSettler: `0x${string}`;
@@ -30,6 +31,11 @@ export function orderToIntent(options: {
   inputSettler: `0x${string}`;
   order: StandardOrder;
 }): StandardSolanaIntent;
+export function orderToIntent(options: {
+  namespace: "tron";
+  inputSettler: `0x${string}`;
+  order: StandardOrder;
+}): StandardEVMIntent;
 export function orderToIntent(options: {
   namespace: "eip155";
   inputSettler: `0x${string}`;
@@ -47,6 +53,10 @@ export function orderToIntent(
   const { namespace, inputSettler, order } = options;
 
   if (namespace === "solana") {
+    return asStandardIntent({ namespace, order, inputSettler });
+  }
+
+  if (namespace === "tron") {
     return asStandardIntent({ namespace, order, inputSettler });
   }
 
