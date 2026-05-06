@@ -2,18 +2,12 @@ import type {
   MultichainOrder,
   StandardSolana,
   StandardEVM,
-  StandardTron,
 } from "../types/index";
 
 export interface OrderIntent<
-  TOrder extends
+  TOrder extends StandardEVM | StandardSolana | MultichainOrder =
     | StandardEVM
     | StandardSolana
-    | StandardTron
-    | MultichainOrder =
-    | StandardEVM
-    | StandardSolana
-    | StandardTron
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;

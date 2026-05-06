@@ -23,22 +23,10 @@ export type SolanaOrder = {
   outputs: MandateOutput[];
 };
 
-export type TronOrder = {
-  user: `0x${string}`;
-  nonce: bigint;
-  originChainId: bigint;
-  expires: number;
-  fillDeadline: number;
-  inputOracle: `0x${string}`;
-  inputs: [bigint, bigint][];
-  outputs: MandateOutput[];
-};
-
-export type StandardOrder = SolanaOrder | EVMOrder | TronOrder;
+export type StandardOrder = SolanaOrder | EVMOrder;
 
 export type StandardEVM = EVMOrder;
 export type StandardSolana = SolanaOrder;
-export type StandardTron = TronOrder;
 
 export type MultichainOrderComponent = {
   user: `0x${string}`;

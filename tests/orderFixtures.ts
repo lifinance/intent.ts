@@ -5,7 +5,6 @@ import type {
   MultichainOrder,
   StandardEVM,
   StandardSolana,
-  StandardTron,
 } from "../src/types";
 
 export const CHAIN_ID_ETHEREUM = 1n;
@@ -76,8 +75,8 @@ export function makeStandardSolana(
 export const CHAIN_ID_TRON_MAINNET = 728126428n;
 
 export function makeStandardTron(
-  overrides: Partial<StandardTron> = {},
-): StandardTron {
+  overrides: Partial<StandardEVM> = {},
+): StandardEVM {
   return {
     user: TEST_USER,
     nonce: 1n,

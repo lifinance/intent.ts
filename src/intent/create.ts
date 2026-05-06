@@ -8,7 +8,6 @@ import type {
   MultichainOrder,
   StandardEVM,
   StandardSolana,
-  StandardTron,
   TokenContext,
 } from "../types/index";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
@@ -23,7 +22,6 @@ import {
 } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
 import { StandardSolanaIntent } from "./solana/standard.solana";
-import { StandardTronIntent } from "./tron/standard.tron";
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -148,7 +146,7 @@ export class Intent {
           throw new Error(
             `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
           );
-        const tronOrder: StandardTron = {
+        const tronOrder: StandardEVM = {
           user: this.walletUser,
           nonce: this.nonce(),
           originChainId: inputChain,
@@ -166,9 +164,10 @@ export class Intent {
             currentTime,
           }),
         };
-        return new StandardTronIntent(
+        return new StandardEVMIntent(
           inputSettlerForTron(inputChain),
           tronOrder,
+          "tron",
         );
       }
       default: {

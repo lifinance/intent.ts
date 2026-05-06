@@ -26,7 +26,6 @@ import { Intent } from "./create";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
-import { StandardTronIntent } from "./tron/standard.tron";
 
 const originalDateNow = Date.now;
 const originalMathRandom = Math.random;
@@ -310,7 +309,7 @@ describe("Intent", () => {
       chainNamespace: "tron",
     };
 
-    it("returns StandardTronIntent for a tron input token", () => {
+    it("returns StandardEVMIntent with tron namespace for a tron input token", () => {
       const intent = new Intent(
         makeEscrowOptions(
           [ctx(TRON_USDC, 1_000_000n)],
@@ -320,7 +319,8 @@ describe("Intent", () => {
       );
       const result = intent.singlechain();
 
-      expect(result).toBeInstanceOf(StandardTronIntent);
+      expect(result).toBeInstanceOf(StandardEVMIntent);
+      expect(result.namespace).toBe("tron");
       expect(result.inputSettler).toBe(TRON_MAINNET_INPUT_SETTLER);
     });
 
@@ -355,7 +355,8 @@ describe("Intent", () => {
       );
       const result = intent.singlechain();
 
-      expect(result).toBeInstanceOf(StandardTronIntent);
+      expect(result).toBeInstanceOf(StandardEVMIntent);
+      expect(result.namespace).toBe("tron");
       expect(result.asOrder().inputs.length).toBe(2);
     });
   });

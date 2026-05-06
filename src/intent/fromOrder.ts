@@ -7,7 +7,6 @@ import type {
 import { MultichainOrderIntent } from "./evm/multichain.evm";
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
-import { StandardTronIntent } from "./tron/standard.tron";
 import { asMultichainIntent } from "./multichain";
 import { asStandardIntent } from "./standard";
 
@@ -36,7 +35,7 @@ export function orderToIntent(options: {
   namespace: "tron";
   inputSettler: `0x${string}`;
   order: StandardOrder;
-}): StandardTronIntent;
+}): StandardEVMIntent;
 export function orderToIntent(options: {
   namespace: "eip155";
   inputSettler: `0x${string}`;
@@ -50,11 +49,7 @@ export function orderToIntent(options: {
 }): MultichainOrderIntent;
 export function orderToIntent(
   options: OrderToIntentOptions,
-):
-  | StandardEVMIntent
-  | StandardSolanaIntent
-  | StandardTronIntent
-  | MultichainOrderIntent {
+): StandardEVMIntent | StandardSolanaIntent | MultichainOrderIntent {
   const { namespace, inputSettler, order } = options;
 
   if (namespace === "solana") {
