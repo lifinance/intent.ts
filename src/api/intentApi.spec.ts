@@ -409,3 +409,81 @@ describe("IntentApi HTTP", () => {
     expect(body.intent.outputs[0].chain).toBe("eip155:42161");
   });
 });
+
+describe("IntentApi live quotes", () => {
+  it("fetches a live quote for ARB USDC -> Base USDC", async () => {
+    const api = new IntentApi(true);
+    const result = await api.getQuotes({
+      user: "0x1111111111111111111111111111111111111111",
+      userChainId: 42161,
+      inputs: [
+        {
+          sender: "0x1111111111111111111111111111111111111111",
+          asset: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+          chainId: 42161,
+          amount: 10_000_000_000n,
+        },
+      ],
+      outputs: [
+        {
+          receiver: "0x1111111111111111111111111111111111111111",
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          chainId: 8453,
+        },
+      ],
+    });
+
+    expect(result.quotes.length).toBeGreaterThan(0);
+
+    const quote = result.quotes[0]!;
+    expect(quote.quoteId).toBeString();
+    expect(quote.provider).toBeString();
+
+    expect(quote.preview.inputs.length).toBeGreaterThan(0);
+    expect(quote.preview.inputs[0]!.chain).toBe("eip155:42161");
+    expect(quote.preview.outputs.length).toBeGreaterThan(0);
+    expect(quote.preview.outputs[0]!.chain).toBe("eip155:8453");
+
+    expect(quote.order.type).toBe("oif-user-open-v0");
+    expect(quote.order.openIntentTx.chain).toBe("eip155:42161");
+    expect(quote.order.openIntentTx.to).toStartWith("0x");
+    expect(quote.order.openIntentTx.data).toStartWith("0x");
+    expect(quote.order.openIntentTx.gasRequired).toBeString();
+
+    expect(quote.order.checks.allowances.length).toBeGreaterThan(0);
+    const allowance = quote.order.checks.allowances[0]!;
+    expect(allowance.chain).toBe("eip155:42161");
+    expect(allowance.token.toLowerCase()).toBe(
+      "0xaf88d065e77c8cC2239327C5EDb3A432268e5831".toLowerCase(),
+    );
+    expect(allowance.user).toBe("0x1111111111111111111111111111111111111111");
+
+    expect(typeof quote.partialFill).toBe("boolean");
+    expect(quote.failureHandling).toBeString();
+  });
+
+  it("returns empty quotes for unsupported route", async () => {
+    const api = new IntentApi(true);
+    const result = await api.getQuotes({
+      user: "0x1111111111111111111111111111111111111111",
+      userChainId: 1,
+      inputs: [
+        {
+          sender: "0x1111111111111111111111111111111111111111",
+          asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+          chainId: 1,
+          amount: 1n,
+        },
+      ],
+      outputs: [
+        {
+          receiver: "0x1111111111111111111111111111111111111111",
+          asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          chainId: 8453,
+        },
+      ],
+    });
+
+    expect(result.quotes).toBeArray();
+  });
+});

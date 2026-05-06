@@ -94,7 +94,6 @@ type GetQuoteResponse = {
   quotes: {
     quoteId: string;
     provider: string;
-    validUntil: number;
     preview: {
       inputs: QuotePreviewItem[];
       outputs: QuotePreviewItem[];
@@ -111,9 +110,9 @@ type GetQuoteResponse = {
         allowances: {
           chain: string;
           token: string;
-          owner: string;
+          user: string;
           spender: string;
-          amount: string;
+          required: string;
         }[];
       };
     };
