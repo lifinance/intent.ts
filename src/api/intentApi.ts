@@ -1,6 +1,7 @@
 import ky, { HTTPError } from "ky";
 import type {
   MultichainOrder,
+  Namespace,
   NoSignature,
   OrderContainer,
   Quote,
@@ -8,7 +9,6 @@ import type {
   StandardOrder,
 } from "../types/index";
 import { isStandardOrder } from "../intent/index";
-import { getInteropableAddress } from "../helpers/interopableAddress";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
 
@@ -55,48 +55,82 @@ type GetOrderResponse = {
 type GetQuoteOptions = {
   user: `0x${string}`;
   userChainId: number | bigint;
+  userNamespace?: Namespace;
   inputs: {
     sender: `0x${string}`;
     asset: `0x${string}`;
     chainId: number | bigint;
+    namespace?: Namespace;
     amount: bigint;
   }[];
   outputs: {
     receiver: `0x${string}`;
     asset: `0x${string}`;
     chainId: number | bigint;
-    amount: bigint;
+    namespace?: Namespace;
+    amount?: bigint;
   }[];
+  swapType?: "exact-input" | "exact-output";
   minValidUntil?: number;
   exclusiveFor?: `0x${string}`[];
+  preference?: "price" | "speed" | "input-priority" | "trust-minimization";
+  partialFill?: boolean;
+  failureHandling?: (
+    | "refund-automatic"
+    | "refund-claim"
+    | "needs-new-signature"
+  )[];
+};
+
+type QuotePreviewItem = {
+  chain: string;
+  user?: string;
+  receiver?: string;
+  asset: string;
+  amount: string;
 };
 
 type GetQuoteResponse = {
   quotes: {
-    order: null;
-    eta: null;
-    validUntil: null;
-    quoteId: null;
-    metadata: {
-      exclusiveFor: `0x${string}` | `0x${string}`[];
-    };
+    quoteId: string;
+    provider: string;
+    validUntil: number;
     preview: {
-      inputs: {
-        user: `0x${string}`;
-        asset: `0x${string}`;
-        amount: string;
-      }[];
-      outputs: {
-        receiver: `0x${string}`;
-        asset: `0x${string}`;
-        amount: string;
-      }[];
+      inputs: QuotePreviewItem[];
+      outputs: QuotePreviewItem[];
     };
-    provider: null;
-    partialFill: false;
-    failureHandling: "refund-automatic";
+    order: {
+      type: string;
+      openIntentTx: {
+        chain: string;
+        to: string;
+        data: string;
+        gasRequired: string;
+      };
+      checks: {
+        allowances: {
+          chain: string;
+          token: string;
+          owner: string;
+          spender: string;
+          amount: string;
+        }[];
+      };
+    };
+    partialFill: boolean;
+    failureHandling: string;
+    metadata: {
+      exclusiveFor: `0x${string}` | `0x${string}`[] | null;
+    };
   }[];
 };
+
+function toCaip2Chain(
+  chainId: number | bigint,
+  namespace: Namespace = "eip155",
+): string {
+  return `${namespace}:${chainId}`;
+}
 
 type OrderEnvelope = {
   order: unknown;
@@ -365,69 +399,64 @@ export class IntentApi {
     }
   }
 
-  /**
-   * @notice Fetch an intent quote for a set of inputs and outputs.
-   * @param options The intent specifications
-   * @returns The response data containing the quotes
-   */
   async getQuotes(options: GetQuoteOptions): Promise<GetQuoteResponse> {
-    const { user, userChainId, inputs, outputs, minValidUntil, exclusiveFor } =
-      options;
+    const {
+      user,
+      userChainId,
+      userNamespace,
+      inputs,
+      outputs,
+      swapType = "exact-input",
+      minValidUntil,
+      exclusiveFor,
+      preference,
+      partialFill,
+      failureHandling,
+    } = options;
 
-    const lockType: undefined | { kind: "the-compact" } = undefined;
-
-    const rq: {
-      user: string;
-      intent: {
-        intentType: "oif-swap";
-        inputs: {
-          user: string;
-          asset: string;
-          amount: string;
-          lock: { kind: "the-compact" } | undefined;
-        }[];
-        outputs: {
-          receiver: string;
-          asset: string;
-          amount: string;
-        }[];
-        swapType: "exact-input";
-        minValidUntil: number | undefined;
-        metadata?: {
-          exclusiveFor: `0x${string}`[];
+    const intent: Record<string, unknown> = {
+      intentType: "oif-swap",
+      swapType,
+      inputs: inputs.map((input) => {
+        const chain = toCaip2Chain(input.chainId, input.namespace);
+        return {
+          chain,
+          user: input.sender,
+          asset: input.asset,
+          amount: input.amount.toString(),
         };
-      };
-      supportedTypes: ["oif-escrow-v0"];
-    } = {
-      user: getInteropableAddress(user, userChainId),
-      intent: {
-        intentType: "oif-swap",
-        inputs: inputs.map((input) => {
-          return {
-            user: getInteropableAddress(input.sender, input.chainId),
-            asset: getInteropableAddress(input.asset, input.chainId),
-            amount: input.amount.toString(),
-            lock: lockType,
-          };
-        }),
-        outputs: outputs.map((output) => {
-          return {
-            receiver: getInteropableAddress(output.receiver, output.chainId),
-            asset: getInteropableAddress(output.asset, output.chainId),
-            amount: output.amount.toString(),
-          };
-        }),
-        swapType: "exact-input",
-        minValidUntil,
-      },
-      supportedTypes: ["oif-escrow-v0"],
+      }),
+      outputs: outputs.map((output) => {
+        const chain = toCaip2Chain(output.chainId, output.namespace);
+        const o: Record<string, unknown> = {
+          chain,
+          receiver: output.receiver,
+          asset: output.asset,
+        };
+        if (output.amount !== undefined) o.amount = output.amount.toString();
+        return o;
+      }),
     };
+
+    if (minValidUntil !== undefined) intent.minValidUntil = minValidUntil;
+    if (preference !== undefined) intent.preference = preference;
+    if (partialFill !== undefined) intent.partialFill = partialFill;
+    if (failureHandling !== undefined) intent.failureHandling = failureHandling;
     if (exclusiveFor && exclusiveFor.length > 0)
-      rq.intent.metadata = { exclusiveFor };
+      intent.metadata = { exclusiveFor };
+
+    const rq = {
+      user: {
+        chain: toCaip2Chain(userChainId, userNamespace),
+        address: user,
+      },
+      intent,
+      supportedTypes: ["oif-user-open-v0"],
+    };
 
     try {
       return await ky
-        .post(new URL("/quote/request", this.baseUrl), {
+        .post(new URL("/api/v1/integrator/quote/request", this.baseUrl), {
           json: rq,
           timeout: 15000,
         })
