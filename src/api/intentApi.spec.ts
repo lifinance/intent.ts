@@ -410,7 +410,9 @@ describe("IntentApi HTTP", () => {
   });
 });
 
-describe("IntentApi live quotes", () => {
+const LIVE = process.env.RUN_LIVE_TESTS === "true";
+
+describe.skipIf(!LIVE)("IntentApi live quotes", () => {
   it("fetches a live quote for ARB USDC -> Base USDC", async () => {
     const api = new IntentApi(true);
     const result = await api.getQuotes({

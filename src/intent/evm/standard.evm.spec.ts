@@ -6,7 +6,11 @@ import {
 import { compactClaimHash as computeCompactClaimHash } from "../compact/claims";
 import { toStandardBatchCompact } from "../compact/conversions";
 import { computeStandardEVMId, StandardEVMIntent } from "./standard.evm";
-import { makeStandardEvm } from "../../../tests/orderFixtures";
+import {
+  makeStandardEvm,
+  makeStandardTron,
+} from "../../../tests/orderFixtures";
+import { TRON_MAINNET_INPUT_SETTLER } from "../../constants";
 import type { StandardOrder } from "../../types";
 
 function expectBytes32Hex(value: `0x${string}`) {
@@ -111,6 +115,105 @@ describe("standard intent", () => {
         );
         expect(mutatedId).not.toBe(baseId);
       }
+    });
+  });
+
+  describe("Tron order ID", () => {
+    it("is deterministic for identical Tron inputs", () => {
+      const order = makeStandardTron();
+      const id1 = computeStandardEVMId(TRON_MAINNET_INPUT_SETTLER, order);
+      const id2 = computeStandardEVMId(TRON_MAINNET_INPUT_SETTLER, order);
+
+      expect(id1).toBe(id2);
+      expectBytes32Hex(id1);
+    });
+
+    it("differs from EVM order ID with same fields but different settler", () => {
+      const order = makeStandardTron();
+      const tronId = computeStandardEVMId(TRON_MAINNET_INPUT_SETTLER, order);
+      const evmId = computeStandardEVMId(INPUT_SETTLER_ESCROW_LIFI, order);
+
+      expect(tronId).not.toBe(evmId);
+    });
+
+    it("changes when Tron order fields change", () => {
+      const baseOrder = makeStandardTron();
+      const baseId = computeStandardEVMId(
+        TRON_MAINNET_INPUT_SETTLER,
+        baseOrder,
+      );
+      const mutated = makeStandardTron({ nonce: baseOrder.nonce + 1n });
+      const mutatedId = computeStandardEVMId(
+        TRON_MAINNET_INPUT_SETTLER,
+        mutated,
+      );
+
+      expect(mutatedId).not.toBe(baseId);
+    });
+  });
+
+  describe("StandardEVMIntent with tron namespace", () => {
+    it("reports tron namespace", () => {
+      const order = makeStandardTron();
+      const intent = new StandardEVMIntent(
+        TRON_MAINNET_INPUT_SETTLER,
+        order,
+        "tron",
+      );
+
+      expect(intent.namespace).toBe("tron");
+      expect(intent.inputSettler).toBe(TRON_MAINNET_INPUT_SETTLER);
+    });
+
+    it("computes orderId using the tron settler", () => {
+      const order = makeStandardTron();
+      const intent = new StandardEVMIntent(
+        TRON_MAINNET_INPUT_SETTLER,
+        order,
+        "tron",
+      );
+
+      expect(intent.orderId()).toBe(
+        computeStandardEVMId(TRON_MAINNET_INPUT_SETTLER, order),
+      );
+      expectBytes32Hex(intent.orderId());
+    });
+
+    it("returns tron origin chain as the only input chain", () => {
+      const order = makeStandardTron();
+      const intent = new StandardEVMIntent(
+        TRON_MAINNET_INPUT_SETTLER,
+        order,
+        "tron",
+      );
+
+      expect(intent.inputChains()).toEqual([order.originChainId]);
+    });
+
+    it("throws on asBatchCompact for tron namespace", () => {
+      const order = makeStandardTron();
+      const intent = new StandardEVMIntent(
+        TRON_MAINNET_INPUT_SETTLER,
+        order,
+        "tron",
+      );
+
+      expect(() => intent.asBatchCompact()).toThrow(
+        'asBatchCompact is not supported for namespace "tron"',
+      );
+    });
+
+    it("throws on compactClaimHash for tron namespace", () => {
+      const order = makeStandardTron();
+      const intent = new StandardEVMIntent(
+        TRON_MAINNET_INPUT_SETTLER,
+        order,
+        "tron",
+      );
+
+      expect(() => intent.compactClaimHash()).toThrow(
+        'compactClaimHash is not supported for namespace "tron"',
+      );
     });
   });
 

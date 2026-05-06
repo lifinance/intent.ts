@@ -59,6 +59,11 @@ export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   }
 
   asBatchCompact(): BatchCompact {
+    if (this.namespace !== "eip155") {
+      throw new Error(
+        `asBatchCompact is not supported for namespace "${this.namespace}"`,
+      );
+    }
     return toStandardBatchCompact(this.order, INPUT_SETTLER_COMPACT_LIFI);
   }
 
@@ -71,6 +76,11 @@ export class StandardEVMIntent implements OrderIntent<StandardEVM> {
   }
 
   compactClaimHash(): `0x${string}` {
+    if (this.namespace !== "eip155") {
+      throw new Error(
+        `compactClaimHash is not supported for namespace "${this.namespace}"`,
+      );
+    }
     return compactClaimHash(this.asBatchCompact());
   }
 }
