@@ -22,4 +22,13 @@ describe("interopable address", () => {
     expect(encoded.slice(10, 14)).toBe("a4b1");
     expect(encoded.endsWith(address.slice(2))).toBe(true);
   });
+
+  it("encodes TVM chain type for Tron addresses", () => {
+    const address = "0xed0c1ec62fa7acb6e00f5c2cd83bc89cb7c5c3ac" as const;
+    const encoded = getInteropableAddress(address, 728126428n, "0001").slice(2);
+
+    expect(encoded.slice(0, 4)).toBe("0001");
+    expect(encoded.slice(4, 8)).toBe("0001");
+    expect(encoded.endsWith(address.slice(2))).toBe(true);
+  });
 });

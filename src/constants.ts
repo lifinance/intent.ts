@@ -16,7 +16,6 @@ export const MULTICHAIN_INPUT_SETTLER_ESCROW =
 export const MULTICHAIN_INPUT_SETTLER_COMPACT =
   "0x1fccC0807F25A58eB531a0B5b4bf3dCE88808Ed7" as const;
 
-
 // Solana config
 
 export const SOLANA_MAINNET_CHAIN_ID = 1151111081099710n;
@@ -31,7 +30,10 @@ const SOLANA_TESTNET_INPUT_SETTLER_ESCROW = undefined;
 export const SOLANA_DEVNET_INPUT_SETTLER_ESCROW =
   "0x0cb3931fa2bfb2296eb48e6f431df4ab41dc084c068b39f7e1f125604252611c" as const;
 
-export const SOLANA_INPUT_SETTLER_PROGRAMS: Record<string, `0x${string}` | undefined> = {
+export const SOLANA_INPUT_SETTLER_PROGRAMS: Record<
+  string,
+  `0x${string}` | undefined
+> = {
   [SOLANA_MAINNET_CHAIN_ID.toString()]: SOLANA_MAINNET_INPUT_SETTLER_ESCROW,
   [SOLANA_TESTNET_CHAIN_ID.toString()]: SOLANA_TESTNET_INPUT_SETTLER_ESCROW,
   [SOLANA_DEVNET_CHAIN_ID.toString()]: SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
@@ -46,8 +48,32 @@ const SOLANA_TESTNET_OUTPUT_SETTLER_PDA = undefined;
 export const SOLANA_DEVNET_OUTPUT_SETTLER_PDA =
   "0x57e93c230b75ab3ad76e89157ae3ce486fbe4ae4c4ac120882ccf2fdfb88a8bf" as const;
 
-export const SOLANA_OUTPUT_SETTLER_PDAS: Record<string, `0x${string}` | undefined> = {
+export const SOLANA_OUTPUT_SETTLER_PDAS: Record<
+  string,
+  `0x${string}` | undefined
+> = {
   [SOLANA_MAINNET_CHAIN_ID.toString()]: SOLANA_MAINNET_OUTPUT_SETTLER_PDA,
   [SOLANA_TESTNET_CHAIN_ID.toString()]: SOLANA_TESTNET_OUTPUT_SETTLER_PDA,
   [SOLANA_DEVNET_CHAIN_ID.toString()]: SOLANA_DEVNET_OUTPUT_SETTLER_PDA,
+};
+
+// Tron config
+
+export const TRON_MAINNET_CHAIN_ID = 728126428n;
+
+export const TRON_MAINNET_INPUT_SETTLER =
+  "0xed0c1ec62fa7acb6e00f5c2cd83bc89cb7c5c3ac" as const;
+
+export const TRON_INPUT_SETTLER_PROGRAMS: Record<
+  string,
+  `0x${string}` | undefined
+> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_INPUT_SETTLER,
+};
+
+export const TRON_MAINNET_OUTPUT_SETTLER =
+  "0x81049290abb67c7e91ea2a293c2eec562d76a006" as const;
+
+export const TRON_OUTPUT_SETTLERS: Record<string, `0x${string}` | undefined> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_OUTPUT_SETTLER,
 };

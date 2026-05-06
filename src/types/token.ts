@@ -1,4 +1,4 @@
-export type Namespace = "eip155" | "solana";
+export type Namespace = "eip155" | "solana" | "tron";
 
 export type CoreToken = {
   address: `0x${string}`;

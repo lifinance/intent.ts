@@ -4,6 +4,7 @@ import {
   bytes32ToAddress,
   idToToken,
   toBigIntWithDecimals,
+  tronBase58ToHex,
   trunc,
 } from "./convert";
 
@@ -49,5 +50,22 @@ describe("convert helpers", () => {
     const value = `0x${"a".repeat(40)}` as `0x${string}`;
     expect(trunc(value)).toBe("0xaaaaaa...aaaaaa");
     expect(trunc(value, 4)).toBe("0xaaaa...aaaa");
+  });
+
+  describe("tronBase58ToHex", () => {
+    it("converts known Tron Base58 addresses to hex", () => {
+      expect(tronBase58ToHex("TXabfeeRfzpZiK6wABb2KDB3Rbzte87x3o")).toBe(
+        "0xed0c1ec62fa7acb6e00f5c2cd83bc89cb7c5c3ac",
+      );
+      expect(tronBase58ToHex("TMjPeWVpNnHWzPUdnkg8Ud3aLw8HCNf6PP")).toBe(
+        "0x81049290abb67c7e91ea2a293c2eec562d76a006",
+      );
+    });
+
+    it("throws for invalid Base58 characters", () => {
+      expect(() => tronBase58ToHex("T0OOinvalid")).toThrow(
+        "Invalid Base58 character",
+      );
+    });
   });
 });

@@ -2,12 +2,18 @@ import type {
   MultichainOrder,
   StandardSolana,
   StandardEVM,
+  StandardTron,
 } from "../types/index";
 
 export interface OrderIntent<
-  TOrder extends StandardEVM | StandardSolana | MultichainOrder =
+  TOrder extends
     | StandardEVM
     | StandardSolana
+    | StandardTron
+    | MultichainOrder =
+    | StandardEVM
+    | StandardSolana
+    | StandardTron
     | MultichainOrder,
 > {
   inputSettler: `0x${string}`;
@@ -17,4 +23,4 @@ export interface OrderIntent<
   orderId(): `0x${string}`;
 }
 
-export type NAMESPACES = "eip155" | "solana" | "bitcoin";
+export type NAMESPACES = "eip155" | "solana" | "bitcoin" | "tron";

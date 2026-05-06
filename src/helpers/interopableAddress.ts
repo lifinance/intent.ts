@@ -12,7 +12,7 @@ function toHex<T extends string = "">(
 }
 
 type Version = "0001";
-type ChainType = "0000";
+type ChainType = "0000" | "0001";
 type ChainReferenceLength = string;
 type ChainReference = string;
 type Address = string;
@@ -23,9 +23,9 @@ export type InteropableAddress =
 export const getInteropableAddress = (
   address: `0x${string}`,
   chainId: number | bigint,
+  chainType: ChainType = "0000",
 ): InteropableAddress => {
   const version = "0001";
-  const chainType = "0000";
 
   const chainReference = padEven(chainId.toString(16));
   const chainReferenceLength = toHex(chainReference.length / 2);

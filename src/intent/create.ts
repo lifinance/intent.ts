@@ -8,6 +8,7 @@ import type {
   MultichainOrder,
   StandardEVM,
   StandardSolana,
+  StandardTron,
   TokenContext,
 } from "../types/index";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
@@ -18,9 +19,11 @@ import {
   ONE_HOUR,
   inputSettlerForLock,
   inputSettlerForSolana,
+  inputSettlerForTron,
 } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
 import { StandardSolanaIntent } from "./solana/standard.solana";
+import { StandardTronIntent } from "./tron/standard.tron";
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -134,6 +137,38 @@ export class Intent {
         return new StandardSolanaIntent(
           inputSettlerForSolana(inputChain),
           solanaStandardOrder,
+        );
+      }
+      case "tron": {
+        const tronInputs: [bigint, bigint][] = this.inputs.map(
+          ({ token, amount }) => [BigInt(token.address), amount],
+        );
+        const tronInputOracle = this.getOracle(this.verifier, inputChain);
+        if (!tronInputOracle)
+          throw new Error(
+            `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
+          );
+        const tronOrder: StandardTron = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: tronInputOracle,
+          inputs: tronInputs,
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            sameChain,
+            recipient,
+            currentTime,
+          }),
+        };
+        return new StandardTronIntent(
+          inputSettlerForTron(inputChain),
+          tronOrder,
         );
       }
       default: {

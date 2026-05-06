@@ -5,6 +5,11 @@ export {
   computeStandardSolanaId,
   standardOrderToSolanaOrder,
 } from "./solana/standard.solana";
+export {
+  StandardTronIntent,
+  computeStandardTronId,
+  standardOrderToTronOrder,
+} from "./tron/standard.tron";
 export { orderToIntent, isStandardOrder } from "./fromOrder";
 export { StandardEVMIntent, computeStandardEVMId } from "./evm/standard.evm";
 export type { OrderIntent } from "./types";

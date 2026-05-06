@@ -5,6 +5,7 @@ import type {
   MultichainOrder,
   StandardEVM,
   StandardSolana,
+  StandardTron,
 } from "../src/types";
 
 export const CHAIN_ID_ETHEREUM = 1n;
@@ -67,6 +68,24 @@ export function makeStandardSolana(
     fillDeadline: TEST_NOW_SECONDS + 900,
     inputOracle: TEST_POLYMER_ORACLE,
     inputs: [[BigInt(b32("a")), 1_000_000n]],
+    outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
+    ...overrides,
+  };
+}
+
+export const CHAIN_ID_TRON_MAINNET = 728126428n;
+
+export function makeStandardTron(
+  overrides: Partial<StandardTron> = {},
+): StandardTron {
+  return {
+    user: TEST_USER,
+    nonce: 1n,
+    originChainId: CHAIN_ID_TRON_MAINNET,
+    expires: TEST_NOW_SECONDS + 1000,
+    fillDeadline: TEST_NOW_SECONDS + 900,
+    inputOracle: TEST_POLYMER_ORACLE,
+    inputs: [[1n, 1_000_000n]],
     outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
     ...overrides,
   };
