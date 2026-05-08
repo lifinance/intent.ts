@@ -125,6 +125,8 @@ export class Intent {
           outputs: buildMandateOutputs({
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
             inputOracle: solanaInputOracle,
             sameChain,
             recipient,
@@ -156,6 +158,8 @@ export class Intent {
           outputs: buildMandateOutputs({
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
             inputOracle: tronInputOracle,
             sameChain,
             recipient,
@@ -206,6 +210,8 @@ export class Intent {
           outputs: buildMandateOutputs({
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
             inputOracle: evmInputOracle,
             sameChain,
             recipient,
@@ -263,6 +269,8 @@ export class Intent {
       outputs: buildMandateOutputs({
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
+        getOracle: this.getOracle,
+        verifier: this.verifier,
         inputOracle: inputOracle,
         sameChain: false,
         recipient,

@@ -4,6 +4,7 @@ import {
   SOLANA_OUTPUT_SETTLER_PDAS,
   TRON_OUTPUT_SETTLERS,
 } from "../../constants";
+import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
 import { ONE_MINUTE } from "./shared";
@@ -23,6 +24,8 @@ export function encodeOutputs(outputs: MandateOutput[]) {
 export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
+  getOracle: IntentDeps["getOracle"];
+  verifier: CoreVerifier;
   inputOracle: `0x${string}`;
   sameChain: boolean;
   recipient: `0x${string}`;
@@ -31,6 +34,8 @@ export function buildMandateOutputs(options: {
   const {
     exclusiveFor,
     outputTokens,
+    getOracle,
+    verifier,
     inputOracle,
     sameChain,
     recipient,
@@ -70,9 +75,21 @@ export function buildMandateOutputs(options: {
     } else {
       outputSettler = COIN_FILLER;
     }
-    const outputOracle: `0x${string}` = sameChain
-      ? addressToBytes32(outputSettler)
-      : addressToBytes32(inputOracle);
+    let outputOracle: `0x${string}`;
+    if (sameChain) {
+      outputOracle = addressToBytes32(outputSettler);
+    } else if (verifier === "polymer") {
+      // Polymer stores proofs under address(this) on the input chain, so
+      // output.oracle must be the input chain's oracle for the lookup to match.
+      outputOracle = addressToBytes32(inputOracle);
+    } else {
+      const oracle = getOracle(verifier, token.chainId);
+      if (!oracle)
+        throw new Error(
+          `No oracle configured for verifier "${verifier}" on chain ${token.chainId}`,
+        );
+      outputOracle = addressToBytes32(oracle);
+    }
     return {
       oracle: outputOracle,
       settler: addressToBytes32(outputSettler),
