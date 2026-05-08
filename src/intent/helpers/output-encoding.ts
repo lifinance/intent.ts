@@ -4,7 +4,6 @@ import {
   SOLANA_OUTPUT_SETTLER_PDAS,
   TRON_OUTPUT_SETTLERS,
 } from "../../constants";
-import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
 import { ONE_MINUTE } from "./shared";
@@ -24,8 +23,7 @@ export function encodeOutputs(outputs: MandateOutput[]) {
 export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
-  getOracle: IntentDeps["getOracle"];
-  verifier: CoreVerifier;
+  inputOracle: `0x${string}`;
   sameChain: boolean;
   recipient: `0x${string}`;
   currentTime: number;
@@ -33,8 +31,7 @@ export function buildMandateOutputs(options: {
   const {
     exclusiveFor,
     outputTokens,
-    getOracle,
-    verifier,
+    inputOracle,
     sameChain,
     recipient,
     currentTime,
@@ -73,17 +70,9 @@ export function buildMandateOutputs(options: {
     } else {
       outputSettler = COIN_FILLER;
     }
-    let outputOracle: `0x${string}`;
-    if (sameChain) {
-      outputOracle = addressToBytes32(outputSettler);
-    } else {
-      const oracle = getOracle(verifier, token.chainId);
-      if (!oracle)
-        throw new Error(
-          `No oracle configured for verifier "${verifier}" on chain ${token.chainId}`,
-        );
-      outputOracle = addressToBytes32(oracle);
-    }
+    const outputOracle: `0x${string}` = sameChain
+      ? addressToBytes32(outputSettler)
+      : addressToBytes32(inputOracle);
     return {
       oracle: outputOracle,
       settler: addressToBytes32(outputSettler),
