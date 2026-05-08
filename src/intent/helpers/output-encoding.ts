@@ -26,7 +26,7 @@ export function buildMandateOutputs(options: {
   outputTokens: TokenContext[];
   getOracle: IntentDeps["getOracle"];
   verifier: CoreVerifier;
-  inputOracle: `0x${string}`;
+  inputChainId: bigint;
   sameChain: boolean;
   recipient: `0x${string}`;
   currentTime: number;
@@ -36,7 +36,7 @@ export function buildMandateOutputs(options: {
     outputTokens,
     getOracle,
     verifier,
-    inputOracle,
+    inputChainId,
     sameChain,
     recipient,
     currentTime,
@@ -81,6 +81,11 @@ export function buildMandateOutputs(options: {
     } else if (verifier === "polymer") {
       // Polymer stores proofs under address(this) on the input chain, so
       // output.oracle must be the input chain's oracle for the lookup to match.
+      const inputOracle = getOracle(verifier, inputChainId);
+      if (!inputOracle)
+        throw new Error(
+          `No oracle configured for verifier "${verifier}" on chain ${inputChainId}`,
+        );
       outputOracle = addressToBytes32(inputOracle);
     } else {
       const oracle = getOracle(verifier, token.chainId);

@@ -35,7 +35,7 @@ describe("output encoding helpers", () => {
         return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
       },
       verifier: "polymer",
-      inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+      inputChainId: 1n,
       sameChain: false,
       recipient:
         "0x0000000000000000000000001111111111111111111111111111111111111111",
@@ -75,7 +75,7 @@ describe("output encoding helpers", () => {
         throw new Error("getOracle should not be called for same-chain output");
       },
       verifier: "polymer",
-      inputOracle: "0x0000000000000000000000000000000000000000",
+      inputChainId: 42161n,
       sameChain: true,
       recipient: "0x1111111111111111111111111111111111111111",
       currentTime: 1_700_000_000,
@@ -99,10 +99,10 @@ describe("output encoding helpers", () => {
       exclusiveFor: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       outputTokens,
       getOracle() {
-        throw new Error("getOracle should not be called for polymer verifier");
+        return tronOracle;
       },
       verifier: "polymer",
-      inputOracle: tronOracle,
+      inputChainId: TRON_MAINNET_CHAIN_ID,
       sameChain: false,
       recipient: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       currentTime: 1_700_000_000,
@@ -126,7 +126,7 @@ describe("output encoding helpers", () => {
         return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
       },
       verifier: "polymer",
-      inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+      inputChainId: 1n,
       sameChain: false,
       recipient: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       currentTime: 1_700_000_000,
@@ -158,7 +158,7 @@ describe("output encoding helpers", () => {
         return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
       },
       verifier: "polymer",
-      inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+      inputChainId: 1n,
       sameChain: false,
       recipient:
         "0x0000000000000000000000001111111111111111111111111111111111111111",
@@ -194,7 +194,7 @@ describe("output encoding helpers", () => {
         return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
       },
       verifier: "polymer",
-      inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+      inputChainId: 1n,
       sameChain: false,
       recipient:
         "0x0000000000000000000000001111111111111111111111111111111111111111",
@@ -229,7 +229,7 @@ describe("output encoding helpers", () => {
         return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
       },
       verifier: "polymer",
-      inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+      inputChainId: 1n,
       sameChain: false,
       recipient:
         "0x0000000000000000000000001111111111111111111111111111111111111111",
@@ -251,7 +251,7 @@ describe("output encoding helpers", () => {
           return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
         },
         verifier: "polymer",
-        inputOracle: "0x0000003E06000007A224AeE90052fA6bb46d43C9",
+        inputChainId: 1n,
         sameChain: false,
         recipient: "0x1111111111111111111111111111111111111111",
         currentTime: 1_700_000_000,
@@ -267,7 +267,7 @@ describe("output encoding helpers", () => {
         return wormholeOracle;
       },
       verifier: "wormhole",
-      inputOracle: "0x0000000000000000000000000000000000000000",
+      inputChainId: 1n,
       sameChain: false,
       recipient: "0x1111111111111111111111111111111111111111",
       currentTime: 1_700_000_000,
@@ -296,10 +296,10 @@ describe("output encoding helpers", () => {
     const output = buildMandateOutputs({
       outputTokens: evmOutputTokens,
       getOracle() {
-        throw new Error("getOracle should not be called for polymer verifier");
+        return tronInputOracle;
       },
       verifier: "polymer",
-      inputOracle: tronInputOracle,
+      inputChainId: TRON_MAINNET_CHAIN_ID,
       sameChain: false,
       recipient: "0x1111111111111111111111111111111111111111",
       currentTime: 1_700_000_000,
