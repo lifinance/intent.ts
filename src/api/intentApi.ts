@@ -73,6 +73,11 @@ type GetQuoteOptions = {
   swapType?: "exact-input" | "exact-output";
   minValidUntil?: number;
   exclusiveFor?: `0x${string}`[];
+  /**
+   * Optional integrator key sent as the `X-Integrator-Key` header on the quote
+   * request. Lets an integrator receive integrator-specific quotes.
+   */
+  integratorKey?: string;
   preference?: "price" | "speed" | "input-priority" | "trust-minimization";
   partialFill?: boolean;
   failureHandling?: (
@@ -411,6 +416,7 @@ export class IntentApi {
       preference,
       partialFill,
       failureHandling,
+      integratorKey,
     } = options;
 
     const intent: Record<string, unknown> = {
@@ -458,6 +464,9 @@ export class IntentApi {
         .post(new URL("/api/v1/integrator/quote/request", this.baseUrl), {
           json: rq,
           timeout: 15000,
+          headers: integratorKey
+            ? { "X-Integrator-Key": integratorKey }
+            : undefined,
         })
         .json<GetQuoteResponse>();
     } catch (error) {
