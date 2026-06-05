@@ -1,7 +1,7 @@
 {
   "name": "@lifi/intent",
   "private": false,
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Typescript library for OIF and LI.FI Intent",
   "repository": {
     "type": "git",
@@ -10,26 +10,38 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./_cjs/index.js",
+  "module": "./_esm/index.js",
+  "types": "./_types/index.d.ts",
+  "typings": "./_types/index.d.ts",
   "files": [
-    "dist",
+    "_cjs",
+    "_esm",
+    "_types",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts",
+    "!src/**/*.bench.ts",
     "README.md"
   ],
-  "module": "./dist/index.js",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./_types/index.d.ts",
+      "node": "./_cjs/index.js",
+      "import": "./_esm/index.js",
+      "require": "./_cjs/index.js",
+      "default": "./_cjs/index.js"
     }
   },
-  "type": "module",
   "sideEffects": false,
   "scripts": {
-    "clean": "rm -rf dist/",
+    "clean": "rm -rf _cjs _esm _types dist out",
     "prebuild": "bun run clean",
-    "build": "tsc --project tsconfig.build.json && node ./scripts/rewrite-dist-imports.mjs",
+    "build:js": "rollup -c",
+    "build:types": "tsc --project tsconfig.build.json",
+    "build:markers": "node ./scripts/write-subdir-markers.mjs",
+    "build:smoke": "node ./scripts/smoke.mjs",
+    "build": "bun run build:js && bun run build:types && bun run build:markers && bun run build:smoke",
     "lint:staged": "prettier -w",
     "prepublishOnly": "bun run build && bun run check && bun run test",
     "test": "bun test",
@@ -53,6 +65,8 @@
     "husky": "9.1.7",
     "lint-staged": "16.1.0",
     "prettier": "3.4.2",
+    "rollup": "^4.61.0",
+    "rollup-plugin-esbuild": "^6.2.1",
     "typescript": "^5.6.3"
   }
 }

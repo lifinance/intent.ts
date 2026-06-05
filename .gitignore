@@ -1,17 +1,15 @@
 # Dependencies
 node_modules
 
-# Build and framework output
-.svelte-kit
-build
+# Build output
+_cjs
+_esm
+_types
 dist
-.output
-.vercel
-.netlify
-.wrangler
+out
+*.tgz
+*.tsbuildinfo
 coverage
-playwright-report
-test-results
 .npm-cache
 
 # Env
