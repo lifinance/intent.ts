@@ -136,10 +136,37 @@ describe("Intent", () => {
     expect(single).toBeInstanceOf(StandardEVMIntent);
     expect(single.inputSettler).toBe(INPUT_SETTLER_ESCROW_LIFI);
     expect(order.inputOracle).toBe(COIN_FILLER);
-    expect(order.fillDeadline).toBe(TEST_NOW_SECONDS + 2 * 60 * 60);
-    expect(order.expires).toBe(TEST_NOW_SECONDS + 24 * 60 * 60);
+    expect(order.fillDeadline).toBe(TEST_NOW_SECONDS + 44 * 60 * 60);
+    expect(order.expires).toBe(TEST_NOW_SECONDS + 48 * 60 * 60);
     expect(order.nonce).toBe(2_147_483_648n);
     expect(intent.nonce()).toBe(2_147_483_648n);
+  });
+
+  it("applies expiry and fillDeadline overrides from options", () => {
+    const intent = new Intent(
+      {
+        ...makeEscrowOptions([ctx(ETH_USDC, 10n)], [ctx(ETH_WETH, 1n)]),
+        expiry: 60,
+        fillDeadline: 30,
+      },
+      intentDeps,
+    );
+    const order = intent.singlechain().asOrder();
+
+    expect(order.expires).toBe(TEST_NOW_SECONDS + 60);
+    expect(order.fillDeadline).toBe(TEST_NOW_SECONDS + 30);
+  });
+
+  it("applies expiry and fillDeadline overrides via chained setters", () => {
+    const intent = new Intent(
+      makeEscrowOptions([ctx(ETH_USDC, 10n)], [ctx(ETH_WETH, 1n)]),
+      intentDeps,
+    );
+    expect(intent.setExpiry(120).setFillDeadline(90)).toBe(intent);
+    const order = intent.singlechain().asOrder();
+
+    expect(order.expires).toBe(TEST_NOW_SECONDS + 120);
+    expect(order.fillDeadline).toBe(TEST_NOW_SECONDS + 90);
   });
 
   it("issues a limit order with empty output context when exclusiveFor is omitted", () => {

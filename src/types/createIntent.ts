@@ -16,6 +16,16 @@ type CreateIntentOptionsBase = {
    * as a bytes32 hex string via `solanaAddressToBytes32`.
    */
   outputRecipient?: `0x${string}`;
+  /**
+   * Override the order expiry, in seconds from creation time.
+   * Defaults to 48 hours. Should be greater than or equal to `fillDeadline`.
+   */
+  expiry?: number;
+  /**
+   * Override the fill deadline, in seconds from creation time.
+   * Defaults to 44 hours. Should be less than or equal to `expiry`.
+   */
+  fillDeadline?: number;
 };
 
 export type CreateIntentOptionsEscrow = CreateIntentOptionsBase & {
