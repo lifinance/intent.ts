@@ -38,8 +38,10 @@ export class Intent {
   private outputRecipient?: `0x${string}`;
 
   private _nonce?: bigint;
-  private expiry = ONE_DAY;
-  private fillDeadline = 2 * ONE_HOUR;
+  /** Expiry duration in seconds, relative to intent creation time. Defaults to 48 hours. */
+  private expiry = 2 * ONE_DAY;
+  /** Fill-deadline duration in seconds, relative to intent creation time. Defaults to 44 hours. */
+  private fillDeadline = 44 * ONE_HOUR;
 
   constructor(opts: CreateIntentOptions, deps: IntentDeps) {
     this.lock = opts.lock;
@@ -50,6 +52,26 @@ export class Intent {
     this.getOracle = deps.getOracle;
     this.exclusiveFor = opts.exclusiveFor;
     this.outputRecipient = opts.outputRecipient;
+    if (opts.expiry !== undefined) this.expiry = opts.expiry;
+    if (opts.fillDeadline !== undefined) this.fillDeadline = opts.fillDeadline;
+  }
+
+  /**
+   * Override the expiry duration (seconds from creation time) for this intent.
+   * Returns `this` for chaining.
+   */
+  setExpiry(seconds: number) {
+    this.expiry = seconds;
+    return this;
+  }
+
+  /**
+   * Override the fill-deadline duration (seconds from creation time) for this intent.
+   * Returns `this` for chaining.
+   */
+  setFillDeadline(seconds: number) {
+    this.fillDeadline = seconds;
+    return this;
   }
 
   numInputChains() {
