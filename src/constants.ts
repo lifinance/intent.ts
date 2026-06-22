@@ -62,7 +62,7 @@ export const SOLANA_OUTPUT_SETTLER_PDAS: Record<
 export const TRON_MAINNET_CHAIN_ID = 728126428n;
 
 export const TRON_MAINNET_INPUT_SETTLER =
-  "0xed0c1ec62fa7acb6e00f5c2cd83bc89cb7c5c3ac" as const;
+  "0xef1b684567bfcbabb19d01a84bc3f218081b1536" as const;
 
 export const TRON_INPUT_SETTLER_PROGRAMS: Record<
   string,
@@ -72,7 +72,7 @@ export const TRON_INPUT_SETTLER_PROGRAMS: Record<
 };
 
 export const TRON_MAINNET_OUTPUT_SETTLER =
-  "0x81049290abb67c7e91ea2a293c2eec562d76a006" as const;
+  "0x52a5f2a94125ef11673f86104e2ce3f86ece2c25" as const;
 
 export const TRON_OUTPUT_SETTLERS: Record<string, `0x${string}` | undefined> = {
   [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_OUTPUT_SETTLER,
