@@ -32,6 +32,20 @@ export function getOutputHash(output: MandateOutput) {
   );
 }
 
+/**
+ * Serialises a FillDescription for proof lookups (`isProven`).
+ *
+ * ⚠️ KNOWN INCOMPATIBILITY with the settler generation whose addresses this file
+ * now points at. Upstream `MandateOutputEncodingLib` was reworked to prefix every
+ * cross-chain proof payload with a 4-byte domain magic:
+ *   FILL_MAGIC       = bytes4(keccak256("OIF.Fill"))      = 0xd1252dff
+ *   NOT_FILLED_MAGIC = bytes4(keccak256("OIF.NotFilled")) = 0x830c1e1c
+ * The layout below is still the old, unprefixed one, so `keccak256(encodeMandateOutput(...))`
+ * will not match the payload hash the new oracles/settlers store, and proof lookups
+ * silently return "not proven". Needs a follow-up that adds the magic (and a
+ * `NotFilledDescription` encoder) plus golden vectors against the Solidity library.
+ * `getOutputHash` above is unaffected: its preimage is unchanged upstream.
+ */
 export function encodeMandateOutput({
   solver,
   orderId,
