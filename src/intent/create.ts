@@ -18,6 +18,7 @@ import {
   ONE_HOUR,
   inputSettlerForLock,
   inputSettlerForSolana,
+  outputSettlerForTron,
   inputSettlerForTron,
 } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
@@ -126,6 +127,32 @@ export class Intent {
     const sameChain = this.isSameChain();
     const { recipient } = this;
 
+    // The first input's namespace selects the whole branch below — a mixed
+    // array would silently encode the rest of the inputs wrong.
+    const mixedInput = this.inputs.find(
+      ({ token }) => token.chainNamespace !== firstInput.token.chainNamespace,
+    );
+    if (mixedInput) {
+      throw new Error(
+        `All inputs must share one chain namespace; got "${firstInput.token.chainNamespace}" and "${mixedInput.token.chainNamespace}"`,
+      );
+    }
+
+    // Cross-namespace orders must name their recipient explicitly. The
+    // default recipient is the source-chain account, and reusing those 20
+    // bytes on a different namespace only works for plain EOA keys — a smart
+    // wallet (Safe), exchange deposit address, or non-exportable signer has
+    // no key on the destination chain, so the output would be unrecoverable.
+    const inputNamespace = firstInput.token.chainNamespace ?? "eip155";
+    const crossNamespaceOutput = this.outputs.find(
+      ({ token }) => (token.chainNamespace ?? "eip155") !== inputNamespace,
+    );
+    if (crossNamespaceOutput && this.outputRecipient === undefined) {
+      throw new Error(
+        `Orders with outputs on a different chain namespace ("${crossNamespaceOutput.token.chainNamespace}") than the inputs ("${inputNamespace}") require an explicit output recipient`,
+      );
+    }
+
     switch (firstInput.token.chainNamespace) {
       case "solana": {
         if (this.inputs.length > 1) {
@@ -164,11 +191,20 @@ export class Intent {
         const tronInputs: [bigint, bigint][] = this.inputs.map(
           ({ token, amount }) => [BigInt(token.address), amount],
         );
-        const tronInputOracle = this.getOracle(this.verifier, inputChain);
-        if (!tronInputOracle)
-          throw new Error(
-            `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
-          );
+        // Same-chain fills mirror the EVM behavior: the output settler doubles
+        // as the input oracle (attested via `setAttestation` after the fill),
+        // so no cross-chain oracle is required.
+        let tronInputOracle: `0x${string}`;
+        if (sameChain) {
+          tronInputOracle = outputSettlerForTron(inputChain);
+        } else {
+          const oracle = this.getOracle(this.verifier, inputChain);
+          if (!oracle)
+            throw new Error(
+              `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
+            );
+          tronInputOracle = oracle;
+        }
         const tronOrder: StandardEVM = {
           user: this.walletUser,
           nonce: this.nonce(),
@@ -252,6 +288,16 @@ export class Intent {
     const [firstInput] = this.inputs;
     if (!firstInput) {
       throw new Error("Intent requires at least one input token");
+    }
+    // Multichain orders encode every input for the EVM lock path; a Solana or
+    // Tron input would be silently mis-encoded rather than rejected.
+    const nonEvm = this.inputs.find(
+      ({ token }) => (token.chainNamespace ?? "eip155") !== "eip155",
+    );
+    if (nonEvm) {
+      throw new Error(
+        `Multichain orders only support eip155 inputs; got "${nonEvm.token.chainNamespace}" input on chain ${nonEvm.token.chainId}`,
+      );
     }
     const currentTime = Math.floor(Date.now() / 1000);
     const inputOracle = this.getOracle(this.verifier, firstInput.token.chainId);

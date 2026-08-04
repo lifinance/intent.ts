@@ -5,17 +5,19 @@ import {
   MULTICHAIN_INPUT_SETTLER_COMPACT,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+  TRON_MAINNET_INPUT_SETTLER,
 } from "../constants";
 import { ResetPeriod } from "../compact/idLib";
 import { orderToIntent } from ".";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
-import { StandardEVMIntent } from "./evm/standard.evm";
+import { computeStandardEVMId, StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
 import {
   CHAIN_ID_ETHEREUM,
   makeMultichainOrder,
   makeStandardSolana,
   makeStandardEvm,
+  makeStandardTron,
 } from "../../tests/orderFixtures";
 
 describe("intent core split", () => {
@@ -91,5 +93,24 @@ describe("intent core split", () => {
     expect(intent).toBeInstanceOf(StandardSolanaIntent);
     expect(intent.inputSettler).toBe(SOLANA_DEVNET_INPUT_SETTLER_ESCROW);
     expect(intent.orderId()).toBe(intent.orderId());
+  });
+
+  it("hydrates a tron order into a tron-namespaced StandardEVMIntent", () => {
+    const order = makeStandardTron();
+    const intent = orderToIntent({
+      namespace: "tron",
+      inputSettler: TRON_MAINNET_INPUT_SETTLER,
+      order,
+    });
+
+    expect(intent).toBeInstanceOf(StandardEVMIntent);
+    expect(intent.namespace).toBe("tron");
+    expect(intent.inputSettler).toBe(TRON_MAINNET_INPUT_SETTLER);
+    expect(intent.orderId()).toBe(
+      computeStandardEVMId(TRON_MAINNET_INPUT_SETTLER, order),
+    );
+    expect(() =>
+      (intent as InstanceType<typeof StandardEVMIntent>).asBatchCompact(),
+    ).toThrow('asBatchCompact is not supported for namespace "tron"');
   });
 });

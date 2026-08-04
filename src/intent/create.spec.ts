@@ -7,7 +7,9 @@ import {
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
   TRON_MAINNET_CHAIN_ID,
   TRON_MAINNET_INPUT_SETTLER,
+  TRON_MAINNET_OUTPUT_SETTLER,
 } from "../constants";
+import { addressToBytes32 } from "../helpers/convert";
 import type { IntentDeps } from "../deps";
 import {
   CHAIN_ID_ARBITRUM,
@@ -87,6 +89,9 @@ function makeEscrowOptions(
     outputTokens,
     verifier: "polymer",
     account: TEST_USER,
+    // Cross-namespace fixtures need an explicit recipient (see the
+    // cross-namespace recipient guard in Intent.singlechain).
+    outputRecipient: TEST_USER,
     lock: { type: "escrow" },
   };
 }
@@ -385,6 +390,79 @@ describe("Intent", () => {
       expect(result).toBeInstanceOf(StandardEVMIntent);
       expect(result.namespace).toBe("tron");
       expect(result.asOrder().inputs.length).toBe(2);
+    });
+
+    it("requires an explicit recipient for cross-namespace outputs", () => {
+      const options = makeEscrowOptions(
+        [ctx(TRON_USDC, 1_000_000n)],
+        [ctx(ARB_USDC, 1_000_000n)],
+      );
+      delete options.outputRecipient;
+      const intent = new Intent(options, tronIntentDeps);
+
+      expect(() => intent.singlechain()).toThrow(
+        "require an explicit output recipient",
+      );
+    });
+
+    it("uses the tron output settler as inputOracle for same-chain fills without consulting getOracle", () => {
+      const TRON_USDT: CoreToken = {
+        address: "0xa614f803b6fd780986a42c78ec9c7f77e6ded13c",
+        name: "USDT",
+        chainId: TRON_MAINNET_CHAIN_ID,
+        decimals: 6,
+        chainNamespace: "tron",
+      };
+      const noTronOracleDeps: IntentDeps = {
+        getOracle() {
+          return undefined;
+        },
+      };
+      const intent = new Intent(
+        makeEscrowOptions([ctx(TRON_USDC, 1n)], [ctx(TRON_USDT, 1n)]),
+        noTronOracleDeps,
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.inputOracle).toBe(TRON_MAINNET_OUTPUT_SETTLER);
+      expect(order.outputs[0]!.oracle).toBe(
+        addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+      );
+      expect(order.outputs[0]!.settler).toBe(
+        addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+      );
+    });
+
+    it("rejects singlechain inputs with mixed namespaces", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          // Same chain id so the multichain detector does not trip first.
+          [
+            ctx(TRON_USDC, 1n),
+            ctx({ ...ARB_USDC, chainId: TRON_MAINNET_CHAIN_ID }, 1n),
+          ],
+          [ctx(ARB_USDC, 1n)],
+        ),
+        tronIntentDeps,
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        "All inputs must share one chain namespace",
+      );
+    });
+
+    it("rejects multichain orders containing a tron input", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(TRON_USDC, 1n), ctx(ETH_USDC, 1n)],
+          [ctx(ARB_USDC, 1n)],
+        ),
+        tronIntentDeps,
+      );
+
+      expect(() => intent.multichain()).toThrow(
+        "Multichain orders only support eip155 inputs",
+      );
     });
   });
 });

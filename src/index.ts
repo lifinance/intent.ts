@@ -4,6 +4,7 @@ export * from "./constants";
 export * from "./output";
 export * from "./validation";
 export * from "./helpers/convert";
+export * from "./helpers/tron";
 export * from "./compact/idLib";
 export * from "./intent/compact/signing";
 export {

@@ -48,27 +48,10 @@ export function idToToken(id: `0x${string}` | bigint): `0x${string}` {
   return checksumAddress(bytes32ToAddress(id));
 }
 
-const BASE58_ALPHABET =
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-export function tronBase58ToHex(base58Address: string): `0x${string}` {
-  let result = 0n;
-  for (const char of base58Address) {
-    const idx = BASE58_ALPHABET.indexOf(char);
-    if (idx === -1) throw new Error(`Invalid Base58 character: ${char}`);
-    result = result * 58n + BigInt(idx);
-  }
-  const hex = result.toString(16);
-  const padded = hex.length % 2 ? "0" + hex : hex;
-  // Strip 1-byte network prefix (41) and 4-byte checksum (8 hex chars)
-  const rawAddress = padded.slice(2, padded.length - 8);
-  if (rawAddress.length !== 40) {
-    throw new Error(
-      `Invalid Tron address: expected 20-byte address, got ${rawAddress.length / 2} bytes`,
-    );
-  }
-  return `0x${rawAddress}`;
-}
+/** @deprecated Import from `helpers/tron` instead. Unlike the old copy that
+ * lived here, the current implementation verifies the Base58Check checksum
+ * and throws on mismatch. */
+export { tronBase58ToHex } from "./tron";
 
 export function trunc(
   value: `0x${string}`,
