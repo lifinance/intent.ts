@@ -63,9 +63,7 @@ describe("convert helpers", () => {
     });
 
     it("throws for invalid Base58 characters", () => {
-      expect(() => tronBase58ToHex("T0OOinvalid")).toThrow(
-        "Invalid Base58 character",
-      );
+      expect(() => tronBase58ToHex("T0OOinvalid")).toThrow("Unknown letter");
     });
   });
 });

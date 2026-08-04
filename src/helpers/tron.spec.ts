@@ -1,10 +1,16 @@
 import { describe, expect, it } from "bun:test";
+import { createBase58check } from "@scure/base";
+import { sha256 } from "viem";
 import {
   TRON_ADDRESS_PREFIX,
   hexToTronBase58,
   isTronBase58Address,
   tronBase58ToHex,
 } from "./tron";
+
+const base58check = createBase58check((data: Uint8Array) =>
+  sha256(data, "bytes"),
+);
 
 // Known-good vectors: canonical + legacy Tron deployments and Tron USDT/USDC.
 const VECTORS: [string, `0x${string}`][] = [
@@ -59,13 +65,21 @@ describe("tronBase58ToHex", () => {
     for (const char of ["0", "O", "I", "l", "+", " "]) {
       expect(() =>
         tronBase58ToHex(`TRV3PsTLRiWpY6sWi5UAvB7Tacb2FLtCN${char}`),
-      ).toThrow("Invalid Base58 character");
+      ).toThrow("Unknown letter");
     }
   });
 
-  it("throws on wrong payload length", () => {
-    expect(() => tronBase58ToHex("TRV3Ps")).toThrow("25-byte payload");
-    expect(() => tronBase58ToHex("")).toThrow("25-byte payload");
+  it("throws on truncated or empty input (checksum cannot verify)", () => {
+    expect(() => tronBase58ToHex("TRV3Ps")).toThrow("checksum");
+    expect(() => tronBase58ToHex("")).toThrow("checksum");
+  });
+
+  it("throws on a valid-checksum payload of the wrong length", () => {
+    // 0x41 prefix + only 19 body bytes, correctly checksummed.
+    const short = base58check.encode(
+      new Uint8Array([TRON_ADDRESS_PREFIX, ...new Array(19).fill(7)]),
+    );
+    expect(() => tronBase58ToHex(short)).toThrow("21-byte payload");
   });
 
   it("throws on wrong version prefix", () => {
