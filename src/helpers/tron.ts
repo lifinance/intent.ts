@@ -1,71 +1,23 @@
 // --- Tron address helpers (Base58Check) --- //
 
+import { base58 } from "@scure/base";
 import { sha256 } from "viem";
 
 /** Version byte prefixing every Tron mainnet address payload. */
 export const TRON_ADDRESS_PREFIX = 0x41;
 
+// Kept only to name the offending character in errors — the codec itself is
+// @scure/base's audited base58 implementation.
 const BASE58_ALPHABET =
   "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-const BASE58_INDEX = new Map<string, number>(
-  [...BASE58_ALPHABET].map((c, i) => [c, i]),
-);
-
-function base58DecodeBytes(value: string): Uint8Array {
-  // Little-endian byte accumulator.
-  const bytes: number[] = [];
-  for (const char of value) {
-    const idx = BASE58_INDEX.get(char);
-    if (idx === undefined) throw new Error(`Invalid Base58 character: ${char}`);
-    let carry = idx;
-    for (let i = 0; i < bytes.length; i++) {
-      carry += bytes[i]! * 58;
-      bytes[i] = carry & 0xff;
-      carry >>= 8;
-    }
-    while (carry > 0) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
+function decodeBase58(value: string): Uint8Array {
+  try {
+    return base58.decode(value);
+  } catch {
+    const invalid = [...value].find((char) => !BASE58_ALPHABET.includes(char));
+    throw new Error(`Invalid Base58 character: ${invalid ?? "?"}`);
   }
-  // Leading '1' characters encode leading zero bytes.
-  let leadingZeros = 0;
-  for (const char of value) {
-    if (char !== "1") break;
-    leadingZeros++;
-  }
-  const out = new Uint8Array(leadingZeros + bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    out[leadingZeros + i] = bytes[bytes.length - 1 - i]!;
-  }
-  return out;
-}
-
-function base58EncodeBytes(bytes: Uint8Array): string {
-  // Little-endian base58 digit accumulator.
-  const digits: number[] = [];
-  for (const byte of bytes) {
-    let carry = byte;
-    for (let i = 0; i < digits.length; i++) {
-      carry += digits[i]! * 256;
-      digits[i] = carry % 58;
-      carry = Math.floor(carry / 58);
-    }
-    while (carry > 0) {
-      digits.push(carry % 58);
-      carry = Math.floor(carry / 58);
-    }
-  }
-  let result = "";
-  for (const byte of bytes) {
-    if (byte !== 0) break;
-    result += "1";
-  }
-  for (let i = digits.length - 1; i >= 0; i--) {
-    result += BASE58_ALPHABET[digits[i]!];
-  }
-  return result;
 }
 
 function bytesToHex(bytes: Uint8Array): `0x${string}` {
@@ -75,8 +27,7 @@ function bytesToHex(bytes: Uint8Array): `0x${string}` {
 }
 
 function checksumOf(payload: Uint8Array): Uint8Array {
-  const first = sha256(bytesToHex(payload), "bytes");
-  return sha256(bytesToHex(first), "bytes").slice(0, 4);
+  return sha256(sha256(payload, "bytes"), "bytes").slice(0, 4);
 }
 
 /**
@@ -88,7 +39,7 @@ function checksumOf(payload: Uint8Array): Uint8Array {
  * different 20-byte address.
  */
 export function tronBase58ToHex(base58Address: string): `0x${string}` {
-  const decoded = base58DecodeBytes(base58Address);
+  const decoded = decodeBase58(base58Address);
   if (decoded.length !== 25) {
     throw new Error(
       `Invalid Tron address: expected 25-byte payload, got ${decoded.length} bytes`,
@@ -128,7 +79,7 @@ export function hexToTronBase58(address: `0x${string}`): string {
   const payload = new Uint8Array(25);
   payload.set(body);
   payload.set(checksum, 21);
-  return base58EncodeBytes(payload);
+  return base58.encode(payload);
 }
 
 /**
