@@ -48,11 +48,6 @@ export function idToToken(id: `0x${string}` | bigint): `0x${string}` {
   return checksumAddress(bytes32ToAddress(id));
 }
 
-/** @deprecated Import from `helpers/tron` instead. Unlike the old copy that
- * lived here, the current implementation verifies the Base58Check checksum
- * and throws on mismatch. */
-export { tronBase58ToHex } from "./tron";
-
 export function trunc(
   value: `0x${string}`,
   length: number = 6,
