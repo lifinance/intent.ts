@@ -54,11 +54,11 @@ describe("convert helpers", () => {
 
   describe("tronBase58ToHex", () => {
     it("converts known Tron Base58 addresses to hex", () => {
-      expect(tronBase58ToHex("TXabfeeRfzpZiK6wABb2KDB3Rbzte87x3o")).toBe(
-        "0xed0c1ec62fa7acb6e00f5c2cd83bc89cb7c5c3ac",
+      expect(tronBase58ToHex("TXmVLCXzrhzmeCfchDPTmFF6Qe7rg3H7Kk")).toBe(
+        "0xef1b684567bfcbabb19d01a84bc3f218081b1536",
       );
-      expect(tronBase58ToHex("TMjPeWVpNnHWzPUdnkg8Ud3aLw8HCNf6PP")).toBe(
-        "0x81049290abb67c7e91ea2a293c2eec562d76a006",
+      expect(tronBase58ToHex("THWDD3umarircbqo8jXxVazbpJnE25VjhN")).toBe(
+        "0x52a5f2a94125ef11673f86104e2ce3f86ece2c25",
       );
     });
 
