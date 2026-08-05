@@ -4,13 +4,17 @@ export const BYTES32_ZERO =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 
 export const COMPACT = "0x00000000000000171ede64904551eeDF3C6C9788" as const;
+// OutputSettlerSimple, 2026-08-04 EVM deployment. CREATE2 from
+// 0x4e59b44847b379578588920cA78FbF26c0B4956C, so the address is identical on
+// every mainnet chain (verified on ethereum, base, arbitrum).
 export const COIN_FILLER =
-  "0x0000000000eC36B683C2E6AC89e9A75989C22a2e" as const;
+  "0x75220B7600c300005038432a0000f308e0000068" as const;
 
 export const INPUT_SETTLER_COMPACT_LIFI =
   "0x0000000000cd5f7fDEc90a03a31F79E5Fbc6A9Cf" as const;
+// InputSettlerEscrowLIFI, same 2026-08-04 deployment as COIN_FILLER above.
 export const INPUT_SETTLER_ESCROW_LIFI =
-  "0x000025c3226C00B2Cdc200005a1600509f4e00C0" as const;
+  "0x00fC00edbe7C003b006f870068c548940000223e" as const;
 export const MULTICHAIN_INPUT_SETTLER_ESCROW =
   "0xb912b4c38ab54b94D45Ac001484dEBcbb519Bc2B" as const;
 export const MULTICHAIN_INPUT_SETTLER_COMPACT =

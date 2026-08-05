@@ -45,6 +45,21 @@ describe("constants", () => {
     }
   });
 
+  it("evm constants point at the 2026-08-04 deployment, not the superseded one", () => {
+    // Verified on-chain: both are CREATE2 deployments from
+    // 0x4e59b44847b379578588920cA78FbF26c0B4956C, verified on ethereum as
+    // OutputSettlerSimple and InputSettlerEscrowLIFI respectively.
+    expect(COIN_FILLER).toBe("0x75220B7600c300005038432a0000f308e0000068");
+    expect(INPUT_SETTLER_ESCROW_LIFI).toBe(
+      "0x00fC00edbe7C003b006f870068c548940000223e",
+    );
+    // Must not regress to the superseded pre-2026-08 deployment.
+    expect(COIN_FILLER).not.toBe("0x0000000000eC36B683C2E6AC89e9A75989C22a2e");
+    expect(INPUT_SETTLER_ESCROW_LIFI).not.toBe(
+      "0x000025c3226C00B2Cdc200005a1600509f4e00C0",
+    );
+  });
+
   it("tron constants match the canonical deployment (checksum-proving base58 round trip)", () => {
     // lifi-oif deployments/tron.json — hexToTronBase58 recomputes the
     // Base58Check checksum, so these assertions prove the hex constants.
