@@ -5,6 +5,7 @@ import {
   MULTICHAIN_INPUT_SETTLER_ESCROW,
   SOLANA_INPUT_SETTLER_PROGRAMS,
   TRON_INPUT_SETTLER_PROGRAMS,
+  TRON_OUTPUT_SETTLERS,
 } from "../../constants";
 import type { CompactLock, EscrowLock } from "../../types";
 
@@ -25,6 +26,13 @@ export function inputSettlerForSolana(chainId: bigint): `0x${string}` {
 
 export function inputSettlerForTron(chainId: bigint): `0x${string}` {
   const settler = TRON_INPUT_SETTLER_PROGRAMS[chainId.toString()];
+  if (!settler) throw new Error(`Unsupported Tron chain id: ${chainId}`);
+  return settler;
+}
+
+/** Returns the deployed output settler address for the given Tron chain ID. Throws for undeployed networks. */
+export function outputSettlerForTron(chainId: bigint): `0x${string}` {
+  const settler = TRON_OUTPUT_SETTLERS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Tron chain id: ${chainId}`);
   return settler;
 }

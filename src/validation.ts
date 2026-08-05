@@ -4,7 +4,6 @@ import type {
 } from "./deps";
 import {
   BYTES32_ZERO,
-  COIN_FILLER,
   INPUT_SETTLER_COMPACT_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
 } from "./constants";
@@ -66,22 +65,28 @@ function getAllowedInputOracles({
 
 function getAllowedOutputOracles({
   allowedOutputOracles,
-  chainId,
+  ...args
 }: Readonly<{
   allowedOutputOracles: StandardOrderValidationDeps["allowedOutputOracles"];
-  chainId: bigint;
+  inputChainId: bigint;
+  inputOracle: `0x${string}`;
+  outputChainId: bigint;
+  sameChainFill: boolean;
 }>): string[] | undefined {
-  const allowed = allowedOutputOracles(chainId);
+  const allowed = allowedOutputOracles(args);
   if (!allowed) return undefined;
-  return [COIN_FILLER, ...allowed]
-    .map((oracle) => addressToBytes32(oracle))
-    .map(normalize);
+  // No implicit COIN_FILLER: it is only a valid output oracle on chains where
+  // it is actually deployed (EVM same-chain fills) — consumers must return it
+  // explicitly. Injecting it globally let e.g. Tron outputs validate with an
+  // EVM-only oracle that can never prove.
+  return allowed.map((oracle) => addressToBytes32(oracle)).map(normalize);
 }
 
 function getAllowedOutputSettlers(
   allowedOutputSettlers: StandardOrderValidationDeps["allowedOutputSettlers"],
+  chainId: bigint,
 ): string[] {
-  return allowedOutputSettlers()
+  return allowedOutputSettlers(chainId)
     .map((settler) => addressToBytes32(settler))
     .map(normalize);
 }
@@ -139,11 +144,14 @@ export function validateOrderWithReason({
   for (const output of order.outputs) {
     const allowedOutputOracles = getAllowedOutputOracles({
       allowedOutputOracles: resolveOutputOracles,
-      chainId: output.chainId,
+      inputChainId: order.originChainId,
+      inputOracle: order.inputOracle,
+      outputChainId: output.chainId,
+      sameChainFill,
     });
     if (!allowedOutputOracles)
       return fail(VALIDATION_ERRORS.UNKNOWN_OUTPUT_CHAIN);
-    if (output.amount < 0n)
+    if (output.amount <= 0n)
       return fail(VALIDATION_ERRORS.OUTPUT_AMOUNT_NON_POSITIVE);
     if (isZeroBytes32(output.oracle))
       return fail(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
@@ -154,11 +162,17 @@ export function validateOrderWithReason({
       return fail(VALIDATION_ERRORS.INVALID_OUTPUT_SETTLER);
     const allowedOutputSettlers = getAllowedOutputSettlers(
       resolveOutputSettlers,
+      output.chainId,
     );
     if (!allowedOutputSettlers.includes(normalize(output.settler))) {
       return fail(VALIDATION_ERRORS.INVALID_OUTPUT_SETTLER);
     }
-    if (isZeroBytes32(output.token))
+    // A zero token is the contracts' encoding for the chain's native asset;
+    // it is only valid where the deployment supports native outputs.
+    if (
+      isZeroBytes32(output.token) &&
+      !deps.supportsNativeOutput?.(output.chainId)
+    )
       return fail(VALIDATION_ERRORS.OUTPUT_TOKEN_ZERO);
     if (isZeroBytes32(output.recipient))
       return fail(VALIDATION_ERRORS.OUTPUT_RECIPIENT_ZERO);
@@ -205,6 +219,7 @@ export function validateOrderContainerWithReason({
         allowedInputOracles: deps.allowedInputOracles,
         allowedOutputOracles: deps.allowedOutputOracles,
         allowedOutputSettlers: deps.allowedOutputSettlers,
+        supportsNativeOutput: deps.supportsNativeOutput,
       },
     });
   }

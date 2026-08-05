@@ -61,8 +61,32 @@ export const SOLANA_OUTPUT_SETTLER_PDAS: Record<
 
 export const TRON_MAINNET_CHAIN_ID = 728126428n;
 
+// Canonical Tron mainnet deployment (lifi-oif deployments/tron.json).
+// Do NOT use these constants directly — always go through
+// `inputSettlerForTron(chainId)` / `outputSettlerForTron(chainId)`,
+// which throw for undeployed networks.
+// InputSettlerEscrowLIFITron: TRV3PsTLRiWpY6sWi5UAvB7Tacb2FLtCNq
 export const TRON_MAINNET_INPUT_SETTLER =
+  "0xaa2e58aa1a4107dc8cc7ef41b97be90b25b5b842" as const;
+// OutputSettlerSimple: TLwJhhq7fExHWdJQfMnsSY7VcreipmhLRm
+export const TRON_MAINNET_OUTPUT_SETTLER =
+  "0x784d4f7b6e99b22d923ec99edbe2e11b38ceac93" as const;
+// PolymerOracleMapped: TPXQkHcGwEdH4Ss8kT4cDxgXt3L4n4zSHJ
+export const TRON_MAINNET_POLYMER_ORACLE =
+  "0x94b0c01e26aff5a6a0fd767afe0e3ca0f8b34e3d" as const;
+
+// Pre-2026-08 deployment, superseded by the canonical addresses above (its
+// `open` is nonpayable — no native TRX inputs). Kept so consumers can keep
+// reading and finalising orders opened against it; never used by builders.
+// TXmVLCXzrhzmeCfchDPTmFF6Qe7rg3H7Kk
+export const TRON_MAINNET_LEGACY_INPUT_SETTLER =
   "0xef1b684567bfcbabb19d01a84bc3f218081b1536" as const;
+// THWDD3umarircbqo8jXxVazbpJnE25VjhN
+export const TRON_MAINNET_LEGACY_OUTPUT_SETTLER =
+  "0x52a5f2a94125ef11673f86104e2ce3f86ece2c25" as const;
+// TCeNWukZUoTSrgWZEMpn9X8C5NtV8Rsy6c
+export const TRON_MAINNET_LEGACY_POLYMER_ORACLE =
+  "0x1d586aa1bd8ea3fda890057bad5a7d373886dbc1" as const;
 
 export const TRON_INPUT_SETTLER_PROGRAMS: Record<
   string,
@@ -71,9 +95,31 @@ export const TRON_INPUT_SETTLER_PROGRAMS: Record<
   [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_INPUT_SETTLER,
 };
 
-export const TRON_MAINNET_OUTPUT_SETTLER =
-  "0x52a5f2a94125ef11673f86104e2ce3f86ece2c25" as const;
-
 export const TRON_OUTPUT_SETTLERS: Record<string, `0x${string}` | undefined> = {
   [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_OUTPUT_SETTLER,
+};
+
+export const TRON_POLYMER_ORACLES: Record<string, `0x${string}` | undefined> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: TRON_MAINNET_POLYMER_ORACLE,
+};
+
+export const TRON_LEGACY_INPUT_SETTLERS: Record<
+  string,
+  readonly `0x${string}`[] | undefined
+> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: [TRON_MAINNET_LEGACY_INPUT_SETTLER],
+};
+
+export const TRON_LEGACY_OUTPUT_SETTLERS: Record<
+  string,
+  readonly `0x${string}`[] | undefined
+> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: [TRON_MAINNET_LEGACY_OUTPUT_SETTLER],
+};
+
+export const TRON_LEGACY_POLYMER_ORACLES: Record<
+  string,
+  readonly `0x${string}`[] | undefined
+> = {
+  [TRON_MAINNET_CHAIN_ID.toString()]: [TRON_MAINNET_LEGACY_POLYMER_ORACLE],
 };

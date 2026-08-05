@@ -1,9 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import {
+  BYTES32_ZERO,
   COIN_FILLER,
   INPUT_SETTLER_COMPACT_LIFI,
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  TRON_MAINNET_CHAIN_ID,
+  TRON_MAINNET_OUTPUT_SETTLER,
+  TRON_MAINNET_POLYMER_ORACLE,
 } from "./constants";
 import type { OrderContainerValidationDeps } from "./deps";
 import {
@@ -21,7 +25,10 @@ import {
   makeMandateOutput,
   makeMultichainOrder,
   makeStandardEvm,
+  makeStandardTron,
+  TEST_POLYMER_ORACLE,
 } from "../tests/orderFixtures";
+import { addressToBytes32 } from "./helpers/convert";
 
 const output = makeMandateOutput(CHAIN_ID_ARBITRUM, 1n, { context: "0x00" });
 
@@ -35,10 +42,15 @@ const validationDeps: OrderContainerValidationDeps = {
     if (sameChainFill) allowed.push(COIN_FILLER);
     return allowed;
   },
-  allowedOutputOracles(chainId) {
-    if (chainId !== CHAIN_ID_ARBITRUM && chainId !== CHAIN_ID_ETHEREUM)
+  allowedOutputOracles({ outputChainId }) {
+    if (
+      outputChainId !== CHAIN_ID_ARBITRUM &&
+      outputChainId !== CHAIN_ID_ETHEREUM
+    )
       return undefined;
-    return ["0x0000003E06000007A224AeE90052fA6bb46d43C9"];
+    // COIN_FILLER must now be returned explicitly — the library no longer
+    // injects it for every chain.
+    return ["0x0000003E06000007A224AeE90052fA6bb46d43C9", COIN_FILLER];
   },
   allowedOutputSettlers() {
     return [COIN_FILLER];
@@ -110,13 +122,16 @@ describe("validation", () => {
     expect(result.reason).toBe(VALIDATION_ERRORS.INPUT_AMOUNT_NON_POSITIVE);
   });
 
-  it("accepts orders with zero output amount", () => {
+  it("rejects orders with zero output amount", () => {
     const zeroOutputAmount = makeStandardEvm({
       outputs: [{ ...output, amount: 0n }],
     });
-    expect(
-      validateOrder({ order: zeroOutputAmount, deps: validationDeps }),
-    ).toBe(true);
+    const result = validateOrderWithReason({
+      order: zeroOutputAmount,
+      deps: validationDeps,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.OUTPUT_AMOUNT_NON_POSITIVE);
   });
 
   it("rejects orders with negative output amount", () => {
@@ -239,5 +254,174 @@ describe("validation", () => {
         deps: validationDeps,
       }),
     ).toBe(true);
+  });
+});
+
+describe("validation (tron)", () => {
+  // Deps that model the chain-aware policy the app is expected to implement:
+  // per-chain settlers, input-oracle correlation, native only on Tron.
+  const tronAwareDeps: OrderContainerValidationDeps = {
+    inputSettlers: [],
+    allowedInputOracles({ chainId }) {
+      if (chainId === TRON_MAINNET_CHAIN_ID)
+        return [TRON_MAINNET_POLYMER_ORACLE];
+      if (chainId === CHAIN_ID_ETHEREUM || chainId === CHAIN_ID_ARBITRUM)
+        return [TEST_POLYMER_ORACLE];
+      return undefined;
+    },
+    allowedOutputOracles({ inputChainId, inputOracle, sameChainFill }) {
+      if (sameChainFill) return [];
+      // Polymer: output.oracle must be the INPUT chain's configured oracle.
+      if (
+        inputChainId === TRON_MAINNET_CHAIN_ID &&
+        inputOracle === TRON_MAINNET_POLYMER_ORACLE
+      )
+        return [TRON_MAINNET_POLYMER_ORACLE];
+      if (inputOracle === TEST_POLYMER_ORACLE) return [TEST_POLYMER_ORACLE];
+      return [];
+    },
+    allowedOutputSettlers(chainId) {
+      if (chainId === TRON_MAINNET_CHAIN_ID)
+        return [TRON_MAINNET_OUTPUT_SETTLER];
+      return [COIN_FILLER];
+    },
+    supportsNativeOutput(chainId) {
+      return chainId === TRON_MAINNET_CHAIN_ID;
+    },
+  };
+
+  const tronOutput = makeMandateOutput(TRON_MAINNET_CHAIN_ID, 5n, {
+    oracle: addressToBytes32(TRON_MAINNET_POLYMER_ORACLE),
+    settler: addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+  });
+
+  it("accepts an EVM->Tron order with the Tron settler on the Tron output", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        { ...tronOutput, oracle: addressToBytes32(TEST_POLYMER_ORACLE) },
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(true);
+  });
+
+  it("rejects the Tron output settler on an EVM output chain", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          settler: addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_SETTLER);
+  });
+
+  it("rejects an output oracle that is not the input chain's oracle", () => {
+    const order = makeStandardTron({
+      inputOracle: TRON_MAINNET_POLYMER_ORACLE,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+        }),
+      ],
+    });
+    const wrongCorrelationDeps: OrderContainerValidationDeps = {
+      ...tronAwareDeps,
+      allowedOutputOracles({ inputOracle }) {
+        // Strict correlation: only the order's own input oracle is valid.
+        return inputOracle === TRON_MAINNET_POLYMER_ORACLE
+          ? [TRON_MAINNET_POLYMER_ORACLE]
+          : [];
+      },
+    };
+    const result = validateOrderWithReason({
+      order,
+      deps: wrongCorrelationDeps,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
+  });
+
+  it("accepts a native (zero-token) output on Tron", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        {
+          ...tronOutput,
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          token: BYTES32_ZERO,
+        },
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(true);
+  });
+
+  it("rejects a native (zero-token) output on chains without native support", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          token: BYTES32_ZERO,
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.OUTPUT_TOKEN_ZERO);
+  });
+
+  it("rejects native outputs everywhere when supportsNativeOutput is omitted", () => {
+    const { supportsNativeOutput: _unused, ...withoutNative } = tronAwareDeps;
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        {
+          ...tronOutput,
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          token: BYTES32_ZERO,
+        },
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: withoutNative });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.OUTPUT_TOKEN_ZERO);
+  });
+
+  it("rejects COIN_FILLER as the oracle on a Tron output", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        {
+          ...tronOutput,
+          oracle: addressToBytes32(COIN_FILLER),
+        },
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
+  });
+
+  it("accepts mixed native and TRC-20 outputs on Tron", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        { ...tronOutput, oracle: addressToBytes32(TEST_POLYMER_ORACLE) },
+        {
+          ...tronOutput,
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          token: BYTES32_ZERO,
+        },
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: tronAwareDeps });
+    expect(result.passed).toBe(true);
   });
 });

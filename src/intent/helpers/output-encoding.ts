@@ -1,13 +1,9 @@
 import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
-import {
-  COIN_FILLER,
-  SOLANA_OUTPUT_SETTLER_PDAS,
-  TRON_OUTPUT_SETTLERS,
-} from "../../constants";
+import { COIN_FILLER, SOLANA_OUTPUT_SETTLER_PDAS } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
-import { ONE_MINUTE } from "./shared";
+import { ONE_MINUTE, outputSettlerForTron } from "./shared";
 
 export function encodeOutputs(outputs: MandateOutput[]) {
   return encodeAbiParameters(
@@ -68,10 +64,7 @@ export function buildMandateOutputs(options: {
         throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
       outputSettler = solanaSettler;
     } else if (token.chainNamespace === "tron") {
-      const tronSettler = TRON_OUTPUT_SETTLERS[token.chainId.toString()];
-      if (!tronSettler)
-        throw new Error(`Unsupported Tron chain id: ${token.chainId}`);
-      outputSettler = tronSettler;
+      outputSettler = outputSettlerForTron(token.chainId);
     } else {
       outputSettler = COIN_FILLER;
     }
