@@ -126,30 +126,6 @@ When touching compact hashing or typed message definitions:
 
 These utilities are the core gate for normalizing and validating inbound order data before execution paths consume it.
 
-### Breaking changes in 0.2.0
-
-- `allowedOutputSettlers` now takes the output `chainId` — return only settlers
-  valid on that specific chain (returning e.g. the Tron settler for an EVM
-  chain is a funds-safety bug: solvers approve tokens to whatever passes).
-- `allowedOutputOracles` now takes
-  `{ inputChainId, inputOracle, outputChainId, sameChainFill }` so Polymer
-  oracles can be correlated with the order's input chain instead of
-  allowlisting a union of every chain's oracle.
-- New optional `supportsNativeOutput(chainId)` dep: zero-token (native)
-  outputs are rejected unless the deployment declares support. Zero-amount
-  outputs are now rejected (`OUTPUT_AMOUNT_NON_POSITIVE`).
-- Tron constants rotated to the canonical deployment
-  (`TRV3Ps…` / `TLwJhh…` / `TPXQkH…`); the previous addresses remain available
-  as `TRON_MAINNET_LEGACY_*` for reading/finalising pre-rotation orders. The
-  legacy input settler's `open` is nonpayable — no native TRX inputs there.
-- `tronBase58ToHex` now verifies the Base58Check checksum and `0x41` prefix
-  (throws on mismatch); `hexToTronBase58` and `isTronBase58Address` are new in
-  `helpers/tron.ts`.
-- Tron same-chain intents use the Tron output settler as `inputOracle`
-  (mirroring the EVM `COIN_FILLER` behavior) and require `setAttestation`
-  after the fill; `Intent.multichain()` rejects non-eip155 inputs and
-  `singlechain()` rejects mixed-namespace input arrays.
-
 ## Dependency Model
 
 - Core has no direct imports from app config/util modules.
