@@ -25,6 +25,12 @@ const expected = [
   "compactTypes",
   "signStandardCompact",
   "getOutputHash",
+  "encodeFillDescription",
+  "encodeNotFilledDescription",
+  "getFillDescriptionHash",
+  "getNotFilledDescriptionHash",
+  "FILL_MAGIC",
+  "NOT_FILLED_MAGIC",
 ];
 
 const missing = expected.filter(
