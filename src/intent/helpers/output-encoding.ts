@@ -1,9 +1,14 @@
 import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
-import { COIN_FILLER, SOLANA_OUTPUT_SETTLER_PDAS } from "../../constants";
+import { COIN_FILLER } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
 import type { MandateOutput, TokenContext } from "../../types";
-import { ONE_MINUTE, outputSettlerForTron } from "./shared";
+import {
+  ONE_MINUTE,
+  outputSettlerForSolana,
+  outputSettlerForTron,
+  polymerOracleProgramForSolana,
+} from "./shared";
 
 export function encodeOutputs(outputs: MandateOutput[]) {
   return encodeAbiParameters(
@@ -39,8 +44,14 @@ export function buildMandateOutputs(options: {
   } = options;
 
   if (exclusiveFor) {
-    const formattedCorrectly =
-      exclusiveFor.length === 42 && exclusiveFor.slice(0, 2) === "0x";
+    // 20-byte EVM/Tron address or a 32-byte Solana solver pubkey. The output
+    // settler compares `exclusive_for` against the raw 32-byte solver
+    // identity (output_settler_simple/src/utils/resolve_output.rs:62-71), so
+    // restricting this to 20 bytes makes exclusive fills structurally
+    // impossible on Solana outputs.
+    const formattedCorrectly = /^0x([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(
+      exclusiveFor,
+    );
     if (!formattedCorrectly) {
       throw new Error(`ExclusiveFor not formatted correctly ${exclusiveFor}`);
     }
@@ -58,11 +69,7 @@ export function buildMandateOutputs(options: {
   return outputTokens.map(({ token, amount }) => {
     let outputSettler: `0x${string}`;
     if (token.chainNamespace === "solana") {
-      const solanaSettler =
-        SOLANA_OUTPUT_SETTLER_PDAS[token.chainId.toString()];
-      if (!solanaSettler)
-        throw new Error(`Unsupported Solana chain id: ${token.chainId}`);
-      outputSettler = solanaSettler;
+      outputSettler = outputSettlerForSolana(token.chainId);
     } else if (token.chainNamespace === "tron") {
       outputSettler = outputSettlerForTron(token.chainId);
     } else {
@@ -71,6 +78,17 @@ export function buildMandateOutputs(options: {
     let outputOracle: `0x${string}`;
     if (sameChain) {
       outputOracle = addressToBytes32(outputSettler);
+    } else if (token.chainNamespace === "solana" && verifier === "polymer") {
+      // Solana identifies its oracle to the EVM PolymerOracle by PROGRAM ID
+      // (`returnedProgramId`), and `oracle_polymer::submit` requires the
+      // fill's LocalAttestation consumer — which is `output.oracle` — to equal
+      // its own program id (oracle_polymer/src/instructions/submit.rs:71).
+      //
+      // The input-chain-oracle rule below only holds because PolymerOracle is
+      // CREATE2-identical across EVM chains; it does not carry over here. Using
+      // it for a Solana output produces an order that fills and can then never
+      // be proven.
+      outputOracle = polymerOracleProgramForSolana(token.chainId);
     } else if (verifier === "polymer") {
       // Polymer stores proofs under address(this) on the input chain, so
       // output.oracle must be the input chain's oracle for the lookup to match.

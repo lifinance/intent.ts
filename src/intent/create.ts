@@ -18,6 +18,7 @@ import {
   ONE_HOUR,
   inputSettlerForLock,
   inputSettlerForSolana,
+  outputSettlerForSolana,
   outputSettlerForTron,
   inputSettlerForTron,
 } from "./helpers/shared";
@@ -158,11 +159,22 @@ export class Intent {
         if (this.inputs.length > 1) {
           throw new Error("SolanaStandardOrder only supports a single input");
         }
-        const solanaInputOracle = this.getOracle(this.verifier, inputChain);
-        if (!solanaInputOracle)
-          throw new Error(
-            `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
-          );
+        // Same-chain fills mirror the EVM and Tron behavior: the fill creates
+        // a LocalAttestation directly, and `validate_fill` takes a branch that
+        // never reads `input_oracle` (input_settler_base/src/base.rs:88-111).
+        // Pointing it at the output settler keeps the encoding canonical
+        // across namespaces; no cross-chain oracle is required.
+        let solanaInputOracle: `0x${string}`;
+        if (sameChain) {
+          solanaInputOracle = outputSettlerForSolana(inputChain);
+        } else {
+          const oracle = this.getOracle(this.verifier, inputChain);
+          if (!oracle)
+            throw new Error(
+              `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
+            );
+          solanaInputOracle = oracle;
+        }
         const solanaStandardOrder: StandardSolana = {
           user: this.walletUser,
           nonce: this.nonce(),

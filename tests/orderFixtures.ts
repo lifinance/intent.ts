@@ -1,4 +1,8 @@
-import { COIN_FILLER } from "../src/constants";
+import {
+  COIN_FILLER,
+  SOLANA_OUTPUT_SETTLER_PDA,
+  SOLANA_POLYMER_ORACLE_PROGRAM,
+} from "../src/constants";
 import { addressToBytes32 } from "../src/helpers/convert";
 import type {
   MandateOutput,
@@ -55,6 +59,7 @@ export function makeStandardEvm(
 }
 
 export const CHAIN_ID_SOLANA_DEVNET = 1151111081099712n;
+export const CHAIN_ID_SOLANA_MAINNET = 1151111081099710n;
 
 export function makeStandardSolana(
   overrides: Partial<StandardSolana> = {},
@@ -65,9 +70,31 @@ export function makeStandardSolana(
     originChainId: CHAIN_ID_SOLANA_DEVNET,
     expires: TEST_NOW_SECONDS + 1000,
     fillDeadline: TEST_NOW_SECONDS + 900,
+    // Deliberately an EVM-shaped oracle so the golden encoding vectors in
+    // src/intent/solana/standard.solana.spec.ts stay stable. A real Solana
+    // input order carries the Polymer oracle PDA (SOLANA_POLYMER_ORACLE_PDA);
+    // the specs that care pass it explicitly.
     inputOracle: TEST_POLYMER_ORACLE,
     inputs: [[BigInt(b32("a")), 1_000_000n]],
     outputs: [makeMandateOutput(CHAIN_ID_ARBITRUM)],
+    ...overrides,
+  };
+}
+
+/**
+ * A MandateOutput on a Solana chain, with the two values that are easy to get
+ * backwards already correct: `oracle` is the Polymer PROGRAM ID, `settler` is
+ * the output settler PDA.
+ */
+export function makeSolanaMandateOutput(
+  chainId = CHAIN_ID_SOLANA_DEVNET,
+  amount = 1n,
+  overrides: Partial<MandateOutput> = {},
+): MandateOutput {
+  return {
+    ...makeMandateOutput(chainId, amount),
+    oracle: SOLANA_POLYMER_ORACLE_PROGRAM,
+    settler: SOLANA_OUTPUT_SETTLER_PDA,
     ...overrides,
   };
 }
