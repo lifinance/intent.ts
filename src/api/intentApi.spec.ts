@@ -408,7 +408,11 @@ describe("IntentApi HTTP", () => {
     expect(body.user.chain).toBe("tron:728126428");
     expect(body.intent.inputs[0].chain).toBe("tron:728126428");
     expect(body.intent.outputs[0].chain).toBe("eip155:42161");
-    // Tron stays hex on the wire. Only Solana re-encodes.
+    // Tron stays hex on the wire. Only Solana re-encodes. This is not an
+    // oversight: order.li.fi accepts a `tron:` output with hex asset+receiver,
+    // base58 asset+receiver, or a mix of the two — all three probed live and
+    // all three returned 200. Solana is the namespace that hard-rejects, so it
+    // is the only one converted.
     expect(body.intent.inputs[0].asset).toBe(
       "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     );
@@ -513,6 +517,34 @@ describe("IntentApi HTTP", () => {
       expect(body.intent.outputs[0].asset).toBe(
         "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       );
+    });
+
+    it("rejects a solana asset whose namespace was left unset", async () => {
+      captureQuoteBody();
+      await expect(
+        new IntentApi(false).getQuotes({
+          user: "0x1111111111111111111111111111111111111111",
+          userChainId: 8453,
+          inputs: [
+            {
+              sender: "0x1111111111111111111111111111111111111111",
+              asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              chainId: 8453,
+              amount: 1_000_000n,
+            },
+          ],
+          outputs: [
+            {
+              receiver: "0x1111111111111111111111111111111111111111",
+              asset: USDC_MINT_BYTES32,
+              chainId: SOLANA_CHAIN_ID,
+              // namespace omitted -> defaults to eip155, which would send
+              // `eip155:1151111081099710` with an unconverted 32-byte asset.
+              amount: 0n,
+            },
+          ],
+        }),
+      ).rejects.toThrow('is 32 bytes but its namespace is "eip155"');
     });
 
     it("rejects a 20-byte EVM address declared as solana", async () => {

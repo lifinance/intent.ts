@@ -170,7 +170,19 @@ function toQuoteAddress(
   value: string,
   namespace: Namespace = "eip155",
 ): string {
-  if (namespace !== "solana") return value;
+  if (namespace !== "solana") {
+    // A 32-byte value under any other namespace is a missing or wrong
+    // `namespace`, not a legitimate address: EVM and Tron are both 20 bytes.
+    // Left unchecked it reaches the API as an `eip155` field and comes back as
+    // `bytes32 value has non-zero upper bytes`, which names the asset rather
+    // than the namespace that actually caused it.
+    if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+      throw new Error(
+        `Quote request invalid: "${value}" is 32 bytes but its namespace is "${namespace}" — set namespace to the chain's own (e.g. "solana")`,
+      );
+    }
+    return value;
+  }
   if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
     return bytes32ToSolanaBase58(value as `0x${string}`);
   }
