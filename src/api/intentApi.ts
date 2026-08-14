@@ -9,6 +9,10 @@ import type {
   StandardOrder,
 } from "../types/index";
 import { isStandardOrder } from "../intent/index";
+import {
+  bytes32ToSolanaBase58,
+  isSolanaBase58Address,
+} from "../helpers/solana";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
 
@@ -52,20 +56,27 @@ type GetOrderResponse = {
   };
 };
 
+/**
+ * Addresses and assets are `string`, not `0x${string}`: a Solana field may be
+ * given either as this library's internal 32-byte hex or as native base58.
+ * `toQuoteAddress` normalizes to what the API expects for `namespace`, so the
+ * namespace must be set on any non-EVM input or output — it selects both the
+ * CAIP-2 chain prefix and the address encoding, and they have to agree.
+ */
 type GetQuoteOptions = {
-  user: `0x${string}`;
+  user: string;
   userChainId: number | bigint;
   userNamespace?: Namespace;
   inputs: {
-    sender: `0x${string}`;
-    asset: `0x${string}`;
+    sender: string;
+    asset: string;
     chainId: number | bigint;
     namespace?: Namespace;
     amount: bigint;
   }[];
   outputs: {
-    receiver: `0x${string}`;
-    asset: `0x${string}`;
+    receiver: string;
+    asset: string;
     chainId: number | bigint;
     namespace?: Namespace;
     amount?: bigint;
@@ -134,6 +145,39 @@ function toCaip2Chain(
   namespace: Namespace = "eip155",
 ): string {
   return `${namespace}:${chainId}`;
+}
+
+/**
+ * An address or asset in the notation its own namespace uses on the wire.
+ *
+ * The quote API reads every field in the namespace declared by the sibling
+ * `chain`, so the two must agree. A Solana mint or account is base58 there, not
+ * this library's internal 32-byte hex: sending the hex form under a `solana:`
+ * chain is rejected with `bytes32 value has non-zero upper bytes`, because the
+ * API tries to read a left-padded 20-byte EVM address out of a full 32-byte
+ * key. (Under an `eip155:` chain the same value fails identically — which is
+ * why a wrong namespace and a wrong encoding surface as one error.)
+ *
+ * Callers keep one internal representation and this converts on the way out.
+ * Already-base58 input passes through, so a caller holding a native Solana
+ * address needs no conversion of its own.
+ *
+ * EVM and Tron are deliberately untouched: the API accepts their hex form
+ * today, and Tron's base58 is a different (checksummed) encoding that should
+ * only be introduced against a verified API expectation.
+ */
+function toQuoteAddress(
+  value: string,
+  namespace: Namespace = "eip155",
+): string {
+  if (namespace !== "solana") return value;
+  if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    return bytes32ToSolanaBase58(value as `0x${string}`);
+  }
+  if (isSolanaBase58Address(value)) return value;
+  throw new Error(
+    `Quote request invalid: "${value}" is not a Solana address (expected base58 or 32-byte hex)`,
+  );
 }
 
 type OrderEnvelope = {
@@ -426,8 +470,8 @@ export class IntentApi {
         const chain = toCaip2Chain(input.chainId, input.namespace);
         return {
           chain,
-          user: input.sender,
-          asset: input.asset,
+          user: toQuoteAddress(input.sender, input.namespace),
+          asset: toQuoteAddress(input.asset, input.namespace),
           amount: input.amount.toString(),
         };
       }),
@@ -435,8 +479,8 @@ export class IntentApi {
         const chain = toCaip2Chain(output.chainId, output.namespace);
         const o: Record<string, unknown> = {
           chain,
-          receiver: output.receiver,
-          asset: output.asset,
+          receiver: toQuoteAddress(output.receiver, output.namespace),
+          asset: toQuoteAddress(output.asset, output.namespace),
         };
         if (output.amount !== undefined) o.amount = output.amount.toString();
         return o;
@@ -453,7 +497,7 @@ export class IntentApi {
     const rq = {
       user: {
         chain: toCaip2Chain(userChainId, userNamespace),
-        address: user,
+        address: toQuoteAddress(user, userNamespace),
       },
       intent,
       supportedTypes: ["oif-user-open-v0"],
