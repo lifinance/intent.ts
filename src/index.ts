@@ -5,6 +5,14 @@ export * from "./output";
 export * from "./validation";
 export * from "./helpers/convert";
 export * from "./helpers/tron";
+export * from "./helpers/solana";
+export {
+  inputSettlerForSolana,
+  inputSettlerProgramForSolana,
+  outputSettlerForSolana,
+  polymerOracleForSolana,
+  polymerOracleProgramForSolana,
+} from "./intent/helpers/shared";
 export * from "./compact/idLib";
 export * from "./intent/compact/signing";
 export {

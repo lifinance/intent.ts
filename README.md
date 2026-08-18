@@ -23,6 +23,45 @@ npm install @lifi/intent
 
 Runtime target: Node.js 20+.
 
+## Solana
+
+Solana public keys and mint addresses use base58 externally and 32-byte hex
+internally. Convert native Solana addresses before building an intent, and
+convert back to base58 when displaying them:
+
+```ts
+import {
+  bytes32ToSolanaBase58,
+  solanaBase58ToBytes32,
+} from "@lifi/intent";
+
+const recipient = solanaBase58ToBytes32(
+  "FWBFarytmqKQajUDiqH6VCAJ2bt4d2Q4X4g38zKQehCy",
+);
+const mint = solanaBase58ToBytes32(
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+);
+
+const token = {
+  address: mint,
+  name: "USDC",
+  chainId: 1151111081099710n,
+  decimals: 6,
+  chainNamespace: "solana" as const,
+};
+
+console.log(bytes32ToSolanaBase58(recipient));
+```
+
+When requesting a quote, set `namespace: "solana"` on every Solana input or
+output. The API client accepts either native base58 or internal bytes32 hex and
+normalizes the wire representation. An omitted namespace defaults to
+`eip155`, so a 32-byte Solana address under that namespace is rejected locally.
+
+Current Solana support is limited to standard single-input orders on mainnet
+and devnet. Testnet has no configured deployment. Solana inputs are not
+supported in multichain or compact orders.
+
 ## Architecture
 
 - `types.ts`

@@ -13,7 +13,7 @@ type CreateIntentOptionsBase = {
    * Override the address that receives output tokens on the destination chain.
    * Defaults to `account` when omitted.
    * For Solana outputs this must be the recipient's Solana public key encoded
-   * as a bytes32 hex string via `solanaAddressToBytes32`.
+   * as a bytes32 hex string via `solanaBase58ToBytes32`.
    */
   outputRecipient?: `0x${string}`;
   /**

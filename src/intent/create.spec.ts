@@ -1,10 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import {
   COIN_FILLER,
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
+  SOLANA_OUTPUT_SETTLER_PDA,
+  SOLANA_POLYMER_ORACLE_PROGRAM,
+  SOLANA_TESTNET_CHAIN_ID,
   TRON_MAINNET_CHAIN_ID,
   TRON_MAINNET_INPUT_SETTLER,
   TRON_MAINNET_OUTPUT_SETTLER,
@@ -12,6 +15,7 @@ import {
 import { addressToBytes32 } from "../helpers/convert";
 import type { IntentDeps } from "../deps";
 import {
+  b32,
   CHAIN_ID_ARBITRUM,
   CHAIN_ID_BASE,
   CHAIN_ID_ETHEREUM,
@@ -82,6 +86,7 @@ function ctx(token: CoreToken, amount: bigint): TokenContext {
 function makeEscrowOptions(
   inputTokens: TokenContext[],
   outputTokens: TokenContext[],
+  overrides: Partial<CreateIntentOptionsEscrow> = {},
 ): CreateIntentOptionsEscrow {
   return {
     exclusiveFor: TEST_USER,
@@ -93,6 +98,7 @@ function makeEscrowOptions(
     // cross-namespace recipient guard in Intent.singlechain).
     outputRecipient: TEST_USER,
     lock: { type: "escrow" },
+    ...overrides,
   };
 }
 
@@ -314,6 +320,81 @@ describe("Intent", () => {
 
       expect(() => intent.singlechain()).toThrow(
         "SolanaStandardOrder only supports a single input",
+      );
+    });
+
+    it("throws for an undeployed solana chain id", () => {
+      const testnetToken: CoreToken = {
+        ...SOLANA_USDC,
+        chainId: SOLANA_TESTNET_CHAIN_ID,
+      };
+      const intent = new Intent(
+        makeEscrowOptions([ctx(testnetToken, 1n)], [ctx(ARB_USDC, 1n)]),
+        {
+          getOracle: () => SOLANA_DEVNET_ORACLE,
+        },
+      );
+
+      expect(() => intent.singlechain()).toThrow("Unsupported Solana chain id");
+    });
+
+    it("names the polymer PROGRAM ID on an EVM->Solana output", () => {
+      // The generic polymer rule would put the input chain's oracle here,
+      // producing an order that fills and can then never be proven —
+      // oracle_polymer::submit compares against its own program id.
+      const getOracle = mock(() => TEST_POLYMER_ORACLE);
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(ARB_USDC, 1_000_000n)],
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          { outputRecipient: b32("c") },
+        ),
+        { getOracle },
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.outputs[0]!.oracle).toBe(SOLANA_POLYMER_ORACLE_PROGRAM);
+      expect(order.outputs[0]!.settler).toBe(SOLANA_OUTPUT_SETTLER_PDA);
+      // The Solana output chain is never asked for an oracle.
+      expect(getOracle).not.toHaveBeenCalledWith(
+        "polymer",
+        SOLANA_DEVNET_CHAIN_ID,
+      );
+    });
+
+    it("uses the output settler as inputOracle for a same-chain solana order", () => {
+      // validate_fill takes the LocalAttestation branch and never reads
+      // input_oracle, so no cross-chain oracle is required.
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(SOLANA_USDC, 1_000_000n)],
+        ),
+        { getOracle: () => undefined },
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.inputOracle).toBe(SOLANA_OUTPUT_SETTLER_PDA);
+      expect(order.outputs[0]!.oracle).toBe(SOLANA_OUTPUT_SETTLER_PDA);
+      expect(order.outputs[0]!.settler).toBe(SOLANA_OUTPUT_SETTLER_PDA);
+    });
+
+    it("keeps a 32-byte solana exclusiveFor unpadded in the context", () => {
+      const solanaSolver = SOLANA_OUTPUT_SETTLER_PDA;
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(ARB_USDC, 1_000_000n)],
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          { outputRecipient: b32("c"), exclusiveFor: solanaSolver },
+        ),
+        { getOracle: () => TEST_POLYMER_ORACLE },
+      );
+      const order = intent.singlechain().asOrder();
+
+      // 0xe0 ‖ bytes32 solver ‖ uint32 start
+      expect(order.outputs[0]!.context.slice(0, 4)).toBe("0xe0");
+      expect(order.outputs[0]!.context.slice(4, 68)).toBe(
+        solanaSolver.slice(2),
       );
     });
   });

@@ -9,6 +9,11 @@ import type {
   StandardOrder,
 } from "../types/index";
 import { isStandardOrder } from "../intent/index";
+import {
+  bytes32ToSolanaBase58,
+  isSolanaBase58Address,
+  solanaBase58ToBytes32,
+} from "../helpers/solana";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
 
@@ -52,20 +57,27 @@ type GetOrderResponse = {
   };
 };
 
+/**
+ * Addresses and assets are `string`, not `0x${string}`: a Solana field may be
+ * given either as this library's internal 32-byte hex or as native base58.
+ * `toQuoteAddress` normalizes to what the API expects for `namespace`, so the
+ * namespace must be set on any non-EVM input or output — it selects both the
+ * CAIP-2 chain prefix and the address encoding, and they have to agree.
+ */
 type GetQuoteOptions = {
-  user: `0x${string}`;
+  user: string;
   userChainId: number | bigint;
   userNamespace?: Namespace;
   inputs: {
-    sender: `0x${string}`;
-    asset: `0x${string}`;
+    sender: string;
+    asset: string;
     chainId: number | bigint;
     namespace?: Namespace;
     amount: bigint;
   }[];
   outputs: {
-    receiver: `0x${string}`;
-    asset: `0x${string}`;
+    receiver: string;
+    asset: string;
     chainId: number | bigint;
     namespace?: Namespace;
     amount?: bigint;
@@ -136,6 +148,51 @@ function toCaip2Chain(
   return `${namespace}:${chainId}`;
 }
 
+/**
+ * An address or asset in the notation its own namespace uses on the wire.
+ *
+ * The quote API reads every field in the namespace declared by the sibling
+ * `chain`, so the two must agree. A Solana mint or account is base58 there, not
+ * this library's internal 32-byte hex: sending the hex form under a `solana:`
+ * chain is rejected with `bytes32 value has non-zero upper bytes`, because the
+ * API tries to read a left-padded 20-byte EVM address out of a full 32-byte
+ * key. (Under an `eip155:` chain the same value fails identically — which is
+ * why a wrong namespace and a wrong encoding surface as one error.)
+ *
+ * Callers keep one internal representation and this converts on the way out.
+ * Already-base58 input passes through, so a caller holding a native Solana
+ * address needs no conversion of its own.
+ *
+ * EVM and Tron are deliberately untouched: the API accepts their hex form
+ * today, and Tron's base58 is a different (checksummed) encoding that should
+ * only be introduced against a verified API expectation.
+ */
+function toQuoteAddress(
+  value: string,
+  namespace: Namespace = "eip155",
+): string {
+  if (namespace !== "solana") {
+    // A 32-byte value under any other namespace is a missing or wrong
+    // `namespace`, not a legitimate address: EVM and Tron are both 20 bytes.
+    // Left unchecked it reaches the API as an `eip155` field and comes back as
+    // `bytes32 value has non-zero upper bytes`, which names the asset rather
+    // than the namespace that actually caused it.
+    if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+      throw new Error(
+        `Quote request invalid: "${value}" is 32 bytes but its namespace is "${namespace}" — set namespace to the chain's own (e.g. "solana")`,
+      );
+    }
+    return value;
+  }
+  if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    return bytes32ToSolanaBase58(value as `0x${string}`);
+  }
+  if (isSolanaBase58Address(value)) return value;
+  throw new Error(
+    `Quote request invalid: "${value}" is not a Solana address (expected base58 or 32-byte hex)`,
+  );
+}
+
 type OrderEnvelope = {
   order: unknown;
   inputSettler: unknown;
@@ -168,6 +225,51 @@ function toBigIntValue(value: unknown, field: string): bigint {
   throw new Error(`Order payload invalid: ${field}`);
 }
 
+/**
+ * An address-shaped field, in whichever encoding its own namespace uses on the
+ * wire, normalized to this library's internal hex form.
+ *
+ * The order API renders every field in the namespace of the chain it belongs
+ * to — the same convention `toQuoteAddress` writes on the way out — so an order
+ * whose origin or output chain is Solana comes back with `user`, `inputOracle`,
+ * `inputSettler`, mints and recipients as raw base58. Left unconverted they
+ * fail `toHexString` and the import dies on the first such field.
+ *
+ * The two encodings cannot collide: base58's alphabet excludes `0`, so no
+ * base58 address can begin with `0x`. Hex is passed through byte-for-byte,
+ * which leaves EVM and Tron orders parsed exactly as before.
+ */
+function toAddress(value: unknown, field: string): `0x${string}` {
+  if (typeof value === "string" && !value.startsWith("0x")) {
+    try {
+      return solanaBase58ToBytes32(value.trim());
+    } catch {
+      throw new Error(`Order payload invalid: ${field}`);
+    }
+  }
+  return toHexString(value, field);
+}
+
+/**
+ * The asset slot of an input tuple: a uint256 token id on EVM and Tron, a
+ * base58 mint on Solana. Base58 decodes to the same 32-byte key the rest of the
+ * library carries as an integer (see `create.ts`, which builds a Solana order's
+ * input as `BigInt(mintHex)`), so both encodings land on one representation.
+ *
+ * The numeric reading is tried first. Base58's alphabet also contains the
+ * digits 1-9, so a decimal id is spellable in it — and every existing order
+ * means the number.
+ */
+function toAssetId(value: unknown, field: string): bigint {
+  if (
+    typeof value === "string" &&
+    !/^(0x[0-9a-fA-F]+|[0-9]+)$/.test(value.trim())
+  ) {
+    return BigInt(toAddress(value, field));
+  }
+  return toBigIntValue(value, field);
+}
+
 function toNumberValue(value: unknown, field: string): number {
   const parsed =
     typeof value === "number"
@@ -197,12 +299,12 @@ function normalizeOutputs(value: unknown) {
     }
     const o = output as Record<string, unknown>;
     return {
-      oracle: toHexString(o.oracle, `outputs[${index}].oracle`),
-      settler: toHexString(o.settler, `outputs[${index}].settler`),
+      oracle: toAddress(o.oracle, `outputs[${index}].oracle`),
+      settler: toAddress(o.settler, `outputs[${index}].settler`),
       chainId: toBigIntValue(o.chainId, `outputs[${index}].chainId`),
-      token: toHexString(o.token, `outputs[${index}].token`),
+      token: toAddress(o.token, `outputs[${index}].token`),
       amount: toBigIntValue(o.amount, `outputs[${index}].amount`),
-      recipient: toHexString(o.recipient, `outputs[${index}].recipient`),
+      recipient: toAddress(o.recipient, `outputs[${index}].recipient`),
       callbackData: toHexString(
         o.callbackData ?? "0x",
         `outputs[${index}].callbackData`,
@@ -216,18 +318,18 @@ function normalizeStandardOrder(order: Record<string, unknown>): StandardOrder {
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toHexString(order.user, "order.user"),
+    user: toAddress(order.user, "order.user"),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     originChainId: toBigIntValue(order.originChainId, "order.originChainId"),
     expires: toNumberValue(order.expires, "order.expires"),
     fillDeadline: toNumberValue(order.fillDeadline, "order.fillDeadline"),
-    inputOracle: toHexString(order.inputOracle, "order.inputOracle"),
+    inputOracle: toAddress(order.inputOracle, "order.inputOracle"),
     inputs: order.inputs.map((input, index) => {
       if (!Array.isArray(input) || input.length !== 2) {
         throw new Error(`Order payload invalid: inputs[${index}]`);
       }
       return [
-        toBigIntValue(input[0], `inputs[${index}][0]`),
+        toAssetId(input[0], `inputs[${index}][0]`),
         toBigIntValue(input[1], `inputs[${index}][1]`),
       ];
     }),
@@ -241,11 +343,11 @@ function normalizeMultichainOrder(
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toHexString(order.user, "order.user"),
+    user: toAddress(order.user, "order.user"),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     expires: toNumberValue(order.expires, "order.expires"),
     fillDeadline: toNumberValue(order.fillDeadline, "order.fillDeadline"),
-    inputOracle: toHexString(order.inputOracle, "order.inputOracle"),
+    inputOracle: toAddress(order.inputOracle, "order.inputOracle"),
     outputs: normalizeOutputs(order.outputs),
     inputs: order.inputs.map((input, index) => {
       if (!input || typeof input !== "object") {
@@ -264,10 +366,7 @@ function normalizeMultichainOrder(
             );
           }
           return [
-            toBigIntValue(
-              tuple[0],
-              `inputs[${index}].inputs[${tupleIndex}][0]`,
-            ),
+            toAssetId(tuple[0], `inputs[${index}].inputs[${tupleIndex}][0]`),
             toBigIntValue(
               tuple[1],
               `inputs[${index}].inputs[${tupleIndex}][1]`,
@@ -311,7 +410,7 @@ export function parseOrderStatusPayload(payload: unknown): OrderContainer {
     : normalizeMultichainOrder(rawOrder);
 
   return {
-    inputSettler: toHexString(envelope.inputSettler, "inputSettler"),
+    inputSettler: toAddress(envelope.inputSettler, "inputSettler"),
     order,
     sponsorSignature: normalizeSignature(envelope.sponsorSignature),
     allocatorSignature: normalizeSignature(envelope.allocatorSignature),
@@ -426,8 +525,8 @@ export class IntentApi {
         const chain = toCaip2Chain(input.chainId, input.namespace);
         return {
           chain,
-          user: input.sender,
-          asset: input.asset,
+          user: toQuoteAddress(input.sender, input.namespace),
+          asset: toQuoteAddress(input.asset, input.namespace),
           amount: input.amount.toString(),
         };
       }),
@@ -435,8 +534,8 @@ export class IntentApi {
         const chain = toCaip2Chain(output.chainId, output.namespace);
         const o: Record<string, unknown> = {
           chain,
-          receiver: output.receiver,
-          asset: output.asset,
+          receiver: toQuoteAddress(output.receiver, output.namespace),
+          asset: toQuoteAddress(output.asset, output.namespace),
         };
         if (output.amount !== undefined) o.amount = output.amount.toString();
         return o;
@@ -453,7 +552,7 @@ export class IntentApi {
     const rq = {
       user: {
         chain: toCaip2Chain(userChainId, userNamespace),
-        address: user,
+        address: toQuoteAddress(user, userNamespace),
       },
       intent,
       supportedTypes: ["oif-user-open-v0"],

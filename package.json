@@ -1,7 +1,7 @@
 {
   "name": "@lifi/intent",
   "private": false,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Typescript library for OIF and LI.FI Intent",
   "repository": {
     "type": "git",
@@ -27,7 +27,10 @@
   "exports": {
     ".": {
       "types": "./_types/index.d.ts",
-      "node": "./_cjs/index.js",
+      "node": {
+        "import": "./_esm/index.js",
+        "require": "./_cjs/index.js"
+      },
       "import": "./_esm/index.js",
       "require": "./_cjs/index.js",
       "default": "./_cjs/index.js"

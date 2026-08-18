@@ -5,6 +5,9 @@ import {
   INPUT_SETTLER_COMPACT_LIFI,
   INPUT_SETTLER_ESCROW_LIFI,
   MULTICHAIN_INPUT_SETTLER_ESCROW,
+  SOLANA_OUTPUT_SETTLER_PDA,
+  SOLANA_POLYMER_ORACLE_PDA,
+  SOLANA_POLYMER_ORACLE_PROGRAM,
   TRON_MAINNET_CHAIN_ID,
   TRON_MAINNET_OUTPUT_SETTLER,
   TRON_MAINNET_POLYMER_ORACLE,
@@ -22,9 +25,13 @@ import {
   b32,
   CHAIN_ID_ARBITRUM,
   CHAIN_ID_ETHEREUM,
+  CHAIN_ID_SOLANA_DEVNET,
+  CHAIN_ID_SOLANA_MAINNET,
   makeMandateOutput,
   makeMultichainOrder,
+  makeSolanaMandateOutput,
   makeStandardEvm,
+  makeStandardSolana,
   makeStandardTron,
   TEST_POLYMER_ORACLE,
 } from "../tests/orderFixtures";
@@ -423,5 +430,235 @@ describe("validation (tron)", () => {
     });
     const result = validateOrderWithReason({ order, deps: tronAwareDeps });
     expect(result.passed).toBe(true);
+  });
+});
+
+describe("validation (solana)", () => {
+  // Deps modelling the policy an app must implement for Solana. The asymmetry
+  // that matters: a Solana OUTPUT is proven under the Polymer PROGRAM ID,
+  // while a Solana INPUT proves under the Polymer oracle PDA.
+  const solanaAwareDeps: OrderContainerValidationDeps = {
+    inputSettlers: [],
+    allowedInputOracles({ chainId, sameChainFill }) {
+      if (
+        chainId === CHAIN_ID_SOLANA_DEVNET ||
+        chainId === CHAIN_ID_SOLANA_MAINNET
+      ) {
+        return sameChainFill
+          ? [SOLANA_OUTPUT_SETTLER_PDA]
+          : [SOLANA_POLYMER_ORACLE_PDA];
+      }
+      if (chainId === CHAIN_ID_ETHEREUM || chainId === CHAIN_ID_ARBITRUM)
+        return [TEST_POLYMER_ORACLE];
+      return undefined;
+    },
+    allowedOutputOracles({ outputChainId, inputOracle, sameChainFill }) {
+      if (sameChainFill) return [SOLANA_OUTPUT_SETTLER_PDA];
+      // A Solana output is identified to Polymer by program id, regardless of
+      // what the input chain's oracle is.
+      if (
+        outputChainId === CHAIN_ID_SOLANA_DEVNET ||
+        outputChainId === CHAIN_ID_SOLANA_MAINNET
+      )
+        return [SOLANA_POLYMER_ORACLE_PROGRAM];
+      if (inputOracle === SOLANA_POLYMER_ORACLE_PDA)
+        return [SOLANA_POLYMER_ORACLE_PDA];
+      if (inputOracle === TEST_POLYMER_ORACLE) return [TEST_POLYMER_ORACLE];
+      return [];
+    },
+    allowedOutputSettlers(chainId) {
+      if (
+        chainId === CHAIN_ID_SOLANA_DEVNET ||
+        chainId === CHAIN_ID_SOLANA_MAINNET
+      )
+        return [SOLANA_OUTPUT_SETTLER_PDA];
+      return [COIN_FILLER];
+    },
+    supportsNativeOutput(chainId) {
+      // native_fill exists on the Solana output settler.
+      return (
+        chainId === CHAIN_ID_SOLANA_DEVNET ||
+        chainId === CHAIN_ID_SOLANA_MAINNET
+      );
+    },
+  };
+
+  it("accepts an EVM->Solana order carrying the polymer program id", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [makeSolanaMandateOutput()],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(true);
+  });
+
+  it("rejects an EVM->Solana output carrying the input chain's EVM oracle", () => {
+    // Regression guard for the buildMandateOutputs bug: the generic polymer
+    // rule (output.oracle = input chain's oracle) produces an order that fills
+    // and can then never be proven.
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 1n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
+  });
+
+  it("rejects the polymer PDA in a Solana output's oracle", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 1n, {
+          oracle: SOLANA_POLYMER_ORACLE_PDA,
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
+  });
+
+  it("rejects the polymer program id as a Solana order's inputOracle", () => {
+    const order = makeStandardSolana({
+      inputOracle: SOLANA_POLYMER_ORACLE_PROGRAM,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INPUT_ORACLE_NOT_ALLOWED);
+  });
+
+  it("accepts a Solana->EVM order using the polymer oracle PDA", () => {
+    const order = makeStandardSolana({
+      inputOracle: SOLANA_POLYMER_ORACLE_PDA,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: SOLANA_POLYMER_ORACLE_PDA,
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(true);
+  });
+
+  it("accepts a same-chain Solana order settled against the output settler", () => {
+    const order = makeStandardSolana({
+      inputOracle: SOLANA_OUTPUT_SETTLER_PDA,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 5n, {
+          oracle: SOLANA_OUTPUT_SETTLER_PDA,
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(true);
+  });
+
+  it("rejects the Solana output settler on an EVM output chain", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeMandateOutput(CHAIN_ID_ARBITRUM, 5n, {
+          oracle: addressToBytes32(TEST_POLYMER_ORACLE),
+          settler: SOLANA_OUTPUT_SETTLER_PDA,
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_SETTLER);
+  });
+
+  it("rejects the superseded pre-vanity-key output settler PDA", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 1n, {
+          settler:
+            "0x57e93c230b75ab3ad76e89157ae3ce486fbe4ae4c4ac120882ccf2fdfb88a8bf",
+        }),
+      ],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.INVALID_OUTPUT_SETTLER);
+  });
+
+  it("accepts a native SOL output and rejects it without native support", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 1n, {
+          token: BYTES32_ZERO,
+        }),
+      ],
+    });
+    expect(
+      validateOrderWithReason({ order, deps: solanaAwareDeps }).passed,
+    ).toBe(true);
+
+    const withoutNative: OrderContainerValidationDeps = {
+      ...solanaAwareDeps,
+      supportsNativeOutput: undefined,
+    };
+    const result = validateOrderWithReason({ order, deps: withoutNative });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.OUTPUT_TOKEN_ZERO);
+  });
+
+  it("rejects a Solana output amount that does not fit u64", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 1n << 64n)],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.OUTPUT_AMOUNT_EXCEEDS_U64);
+  });
+
+  it("allows the largest u64 Solana output amount", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, (1n << 64n) - 1n),
+      ],
+    });
+    expect(
+      validateOrderWithReason({ order, deps: solanaAwareDeps }).passed,
+    ).toBe(true);
+  });
+
+  it("rejects two identical outputs", () => {
+    // One transfer would satisfy both fill records; the user pays twice.
+    const duplicate = makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 5n);
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [duplicate, { ...duplicate }],
+    });
+    const result = validateOrderWithReason({ order, deps: solanaAwareDeps });
+    expect(result.passed).toBe(false);
+    expect(result.reason).toBe(VALIDATION_ERRORS.DUPLICATE_OUTPUTS);
+  });
+
+  it("allows two outputs that differ only by amount", () => {
+    const order = makeStandardEvm({
+      inputOracle: TEST_POLYMER_ORACLE,
+      outputs: [
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 5n),
+        makeSolanaMandateOutput(CHAIN_ID_SOLANA_DEVNET, 6n),
+      ],
+    });
+    expect(
+      validateOrderWithReason({ order, deps: solanaAwareDeps }).passed,
+    ).toBe(true);
   });
 });

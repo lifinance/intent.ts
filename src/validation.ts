@@ -6,10 +6,24 @@ import {
   BYTES32_ZERO,
   INPUT_SETTLER_COMPACT_LIFI,
   MULTICHAIN_INPUT_SETTLER_COMPACT,
+  SOLANA_DEVNET_CHAIN_ID,
+  SOLANA_MAINNET_CHAIN_ID,
+  SOLANA_TESTNET_CHAIN_ID,
 } from "./constants";
 import { addressToBytes32 } from "./helpers/convert";
 import { isStandardOrder } from "./intent/index";
+import { getOutputHash } from "./output";
 import type { OrderContainer, StandardOrder } from "./types/index";
+
+const SOLANA_CHAIN_IDS: ReadonlySet<bigint> = new Set([
+  SOLANA_MAINNET_CHAIN_ID,
+  SOLANA_TESTNET_CHAIN_ID,
+  SOLANA_DEVNET_CHAIN_ID,
+]);
+
+function isSolanaChainId(chainId: bigint): boolean {
+  return SOLANA_CHAIN_IDS.has(chainId);
+}
 
 export type ValidationResult = {
   passed: boolean;
@@ -31,7 +45,12 @@ export enum VALIDATION_ERRORS {
   INVALID_OUTPUT_SETTLER = "output settler",
   OUTPUT_TOKEN_ZERO = "output token",
   OUTPUT_RECIPIENT_ZERO = "output recipient",
+  OUTPUT_AMOUNT_EXCEEDS_U64 = "output amount exceeds u64",
+  DUPLICATE_OUTPUTS = "duplicate outputs",
 }
+
+/** Solana settles output amounts as `u64`; anything larger cannot be filled. */
+const U64_MAX = (1n << 64n) - 1n;
 
 function normalize(value: string) {
   return value.toLowerCase();
@@ -141,6 +160,14 @@ export function validateOrderWithReason({
 
   // 9. outputs
   if (order.outputs.length === 0) return fail(VALIDATION_ERRORS.NO_OUTPUTS);
+  // Two identical outputs can be satisfied by a single transfer, because the
+  // fill record is keyed by (orderId, outputHash) — the settler warns about
+  // exactly this (output_settler_simple/src/instructions/fill.rs:131). The
+  // user would pay for both and receive one. Hashes are collected inside the
+  // loop below, after each output's fields have been validated: getOutputHash
+  // encodes amount as a uint256 and throws on a negative value, which must
+  // surface as OUTPUT_AMOUNT_NON_POSITIVE rather than an exception.
+  const outputHashes = new Set<string>();
   for (const output of order.outputs) {
     const allowedOutputOracles = getAllowedOutputOracles({
       allowedOutputOracles: resolveOutputOracles,
@@ -153,6 +180,11 @@ export function validateOrderWithReason({
       return fail(VALIDATION_ERRORS.UNKNOWN_OUTPUT_CHAIN);
     if (output.amount <= 0n)
       return fail(VALIDATION_ERRORS.OUTPUT_AMOUNT_NON_POSITIVE);
+    // MandateOutput.amount is bytes32 on the wire, but the Solana output
+    // settler resolves it into a u64 (resolve_output.rs:22). Catch it here
+    // rather than letting a solver discover it by reverting mid-fill.
+    if (isSolanaChainId(output.chainId) && output.amount > U64_MAX)
+      return fail(VALIDATION_ERRORS.OUTPUT_AMOUNT_EXCEEDS_U64);
     if (isZeroBytes32(output.oracle))
       return fail(VALIDATION_ERRORS.INVALID_OUTPUT_ORACLE);
     if (!allowedOutputOracles.includes(normalize(output.oracle))) {
@@ -176,6 +208,11 @@ export function validateOrderWithReason({
       return fail(VALIDATION_ERRORS.OUTPUT_TOKEN_ZERO);
     if (isZeroBytes32(output.recipient))
       return fail(VALIDATION_ERRORS.OUTPUT_RECIPIENT_ZERO);
+
+    const outputHash = getOutputHash(output);
+    if (outputHashes.has(outputHash))
+      return fail(VALIDATION_ERRORS.DUPLICATE_OUTPUTS);
+    outputHashes.add(outputHash);
   }
 
   // 11. allocatorData is not validated yet.

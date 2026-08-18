@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { INPUT_SETTLER_ESCROW_LIFI } from "../constants";
 import { isStandardOrder } from "../intent";
+import {
+  bytes32ToSolanaBase58,
+  solanaBase58ToBytes32,
+} from "../helpers/solana";
 import { IntentApi, parseOrderStatusPayload } from "./intentApi";
 
 const BYTES32_ONE =
@@ -102,6 +106,93 @@ describe("parseOrderStatusPayload", () => {
       payload: "0xbeef",
     });
     expect(parsed.allocatorSignature).toEqual({ type: "None", payload: "0x" });
+  });
+
+  it("parses a Solana-origin payload whose fields are base58", () => {
+    // The API renders every field in its own chain's namespace, so an order
+    // opened on Solana comes back with base58 addresses and a base58 mint in
+    // the input tuple, while its Base output stays 32-byte hex. Shape and
+    // values are taken from a real /orders/status response.
+    const USDC_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const USER = "FWBFarytmqKQajUDiqH6VCAJ2bt4d2Q4X4g38zKQehCy";
+    const INPUT_ORACLE = "49zLKETMq34CUC2E2wL1xvv6uN2AUgyhjVX221mjE3Rw";
+    const SOLANA_INPUT_SETTLER = "LiFiRp8RM7nJUZyUYC9FPPpDr7sAy5XPfBN6ABzBgT7";
+    const payload = {
+      order: {
+        user: USER,
+        nonce: "2792426833",
+        originChainId: "1151111081099710",
+        expires: 1_786_896_127,
+        fillDeadline: 1_786_730_527,
+        inputOracle: INPUT_ORACLE,
+        inputs: [[USDC_SOLANA, "1995000"]],
+        outputs: [
+          {
+            oracle: BYTES32_ONE,
+            settler: BYTES32_ONE,
+            chainId: "8453",
+            token: BYTES32_ONE,
+            amount: "1995000",
+            recipient: BYTES32_ONE,
+            callbackData: "0x",
+            context: "0x",
+          },
+        ],
+      },
+      inputSettler: SOLANA_INPUT_SETTLER,
+      sponsorSignature: null,
+      allocatorSignature: null,
+    };
+
+    const parsed = parseOrderStatusPayload(payload);
+    if (!isStandardOrder(parsed.order))
+      throw new Error("Expected standard order");
+
+    // Every address lands on the internal 32-byte hex form and round-trips.
+    expect(bytes32ToSolanaBase58(parsed.order.user)).toBe(USER);
+    expect(bytes32ToSolanaBase58(parsed.order.inputOracle)).toBe(INPUT_ORACLE);
+    expect(bytes32ToSolanaBase58(parsed.inputSettler)).toBe(
+      SOLANA_INPUT_SETTLER,
+    );
+
+    // The mint becomes the same integer `create.ts` builds it as.
+    const input = parsed.order.inputs[0];
+    if (!input) throw new Error("Expected an input");
+    expect(input[0]).toBe(BigInt(solanaBase58ToBytes32(USDC_SOLANA)));
+    expect(input[1]).toBe(1995000n);
+
+    // The hex-namespace output is untouched.
+    const output = parsed.order.outputs[0];
+    if (!output) throw new Error("Expected an output");
+    expect(output.token).toBe(BYTES32_ONE);
+    expect(output.chainId).toBe(8453n);
+  });
+
+  it("keeps a decimal input asset id numeric rather than reading it as base58", () => {
+    // Base58's alphabet contains the digits 1-9, so an EVM token id like "123"
+    // is also a well-formed base58 string. The numeric reading must win.
+    const payload = {
+      data: {
+        order: {
+          user: "0x1111111111111111111111111111111111111111",
+          nonce: "123",
+          originChainId: "8453",
+          expires: 2_000_000_000,
+          fillDeadline: 1_999_999_900,
+          inputOracle: "0x0000000000000000000000000000000000000001",
+          inputs: [["123", "1000000"]],
+          outputs: [],
+        },
+        inputSettler: INPUT_SETTLER,
+      },
+    };
+
+    const parsed = parseOrderStatusPayload(payload);
+    if (!isStandardOrder(parsed.order))
+      throw new Error("Expected standard order");
+    const input = parsed.order.inputs[0];
+    if (!input) throw new Error("Expected an input");
+    expect(input[0]).toBe(123n);
   });
 
   it("throws for invalid payload", () => {
@@ -407,6 +498,173 @@ describe("IntentApi HTTP", () => {
     expect(body.user.chain).toBe("tron:728126428");
     expect(body.intent.inputs[0].chain).toBe("tron:728126428");
     expect(body.intent.outputs[0].chain).toBe("eip155:42161");
+    // Tron stays hex on the wire. Only Solana re-encodes. This is not an
+    // oversight: order.li.fi accepts a `tron:` output with hex asset+receiver,
+    // base58 asset+receiver, or a mix of the two — all three probed live and
+    // all three returned 200. Solana is the namespace that hard-rejects, so it
+    // is the only one converted.
+    expect(body.intent.inputs[0].asset).toBe(
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    );
+  });
+
+  // The API reads each field in the namespace its sibling `chain` declares.
+  // Sending a Solana output under `eip155:` — or under `solana:` but still in
+  // 32-byte hex — is rejected as
+  // `bytes32 value has non-zero upper bytes`, because a full Solana key cannot
+  // be read as a left-padded 20-byte EVM address. Confirmed against
+  // order-dev.li.fi.
+  describe("solana namespace addresses", () => {
+    // USDC on Solana mainnet.
+    const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const USDC_MINT_BYTES32 =
+      "0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61";
+    const SOLANA_CHAIN_ID = 1151111081099710n;
+
+    function captureQuoteBody() {
+      const captured = { body: "" };
+      globalThis.fetch = (async (input, init) => {
+        const request =
+          input instanceof Request
+            ? input
+            : new Request(input.toString(), init);
+        captured.body = await request.clone().text();
+        return new Response(JSON.stringify({ quotes: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof fetch;
+      return captured;
+    }
+
+    it("re-encodes 32-byte hex to base58 for a solana output", async () => {
+      const captured = captureQuoteBody();
+      await new IntentApi(false).getQuotes({
+        user: "0x1111111111111111111111111111111111111111",
+        userChainId: 8453,
+        inputs: [
+          {
+            sender: "0x1111111111111111111111111111111111111111",
+            asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            chainId: 8453,
+            amount: 1_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver:
+              "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+            asset: USDC_MINT_BYTES32,
+            chainId: SOLANA_CHAIN_ID,
+            namespace: "solana",
+            amount: 0n,
+          },
+        ],
+      });
+
+      const output = JSON.parse(captured.body).intent.outputs[0];
+      expect(output.chain).toBe(`solana:${SOLANA_CHAIN_ID}`);
+      expect(output.asset).toBe(USDC_MINT);
+      expect(output.receiver).toBe(
+        bytes32ToSolanaBase58(
+          "0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        ),
+      );
+    });
+
+    it("passes native base58 through unchanged", async () => {
+      const captured = captureQuoteBody();
+      await new IntentApi(false).getQuotes({
+        user: USDC_MINT,
+        userChainId: SOLANA_CHAIN_ID,
+        userNamespace: "solana",
+        inputs: [
+          {
+            sender: USDC_MINT,
+            asset: USDC_MINT,
+            chainId: SOLANA_CHAIN_ID,
+            namespace: "solana",
+            amount: 1_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver: "0x1111111111111111111111111111111111111111",
+            asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            chainId: 8453,
+            amount: 0n,
+          },
+        ],
+      });
+
+      const body = JSON.parse(captured.body);
+      expect(body.user).toEqual({
+        chain: `solana:${SOLANA_CHAIN_ID}`,
+        address: USDC_MINT,
+      });
+      expect(body.intent.inputs[0].asset).toBe(USDC_MINT);
+      // The EVM output is untouched by the Solana input's namespace.
+      expect(body.intent.outputs[0].asset).toBe(
+        "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      );
+    });
+
+    it("rejects a solana asset whose namespace was left unset", async () => {
+      captureQuoteBody();
+      await expect(
+        new IntentApi(false).getQuotes({
+          user: "0x1111111111111111111111111111111111111111",
+          userChainId: 8453,
+          inputs: [
+            {
+              sender: "0x1111111111111111111111111111111111111111",
+              asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              chainId: 8453,
+              amount: 1_000_000n,
+            },
+          ],
+          outputs: [
+            {
+              receiver: "0x1111111111111111111111111111111111111111",
+              asset: USDC_MINT_BYTES32,
+              chainId: SOLANA_CHAIN_ID,
+              // namespace omitted -> defaults to eip155, which would send
+              // `eip155:1151111081099710` with an unconverted 32-byte asset.
+              amount: 0n,
+            },
+          ],
+        }),
+      ).rejects.toThrow('is 32 bytes but its namespace is "eip155"');
+    });
+
+    it("rejects a 20-byte EVM address declared as solana", async () => {
+      captureQuoteBody();
+      await expect(
+        new IntentApi(false).getQuotes({
+          user: "0x1111111111111111111111111111111111111111",
+          userChainId: 8453,
+          inputs: [
+            {
+              sender: "0x1111111111111111111111111111111111111111",
+              asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+              chainId: 8453,
+              amount: 1_000_000n,
+            },
+          ],
+          outputs: [
+            {
+              // An EVM address can never be a Solana account. Failing here beats
+              // a 400 that names `bytes32 value has non-zero upper bytes`.
+              receiver: "0x1111111111111111111111111111111111111111",
+              asset: USDC_MINT_BYTES32,
+              chainId: SOLANA_CHAIN_ID,
+              namespace: "solana",
+              amount: 0n,
+            },
+          ],
+        }),
+      ).rejects.toThrow("is not a Solana address");
+    });
   });
 });
 
