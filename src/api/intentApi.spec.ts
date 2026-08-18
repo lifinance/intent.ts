@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { INPUT_SETTLER_ESCROW_LIFI } from "../constants";
 import { isStandardOrder } from "../intent";
-import { bytes32ToSolanaBase58 } from "../helpers/solana";
+import {
+  bytes32ToSolanaBase58,
+  solanaBase58ToBytes32,
+} from "../helpers/solana";
 import { IntentApi, parseOrderStatusPayload } from "./intentApi";
 
 const BYTES32_ONE =
@@ -103,6 +106,93 @@ describe("parseOrderStatusPayload", () => {
       payload: "0xbeef",
     });
     expect(parsed.allocatorSignature).toEqual({ type: "None", payload: "0x" });
+  });
+
+  it("parses a Solana-origin payload whose fields are base58", () => {
+    // The API renders every field in its own chain's namespace, so an order
+    // opened on Solana comes back with base58 addresses and a base58 mint in
+    // the input tuple, while its Base output stays 32-byte hex. Shape and
+    // values are taken from a real /orders/status response.
+    const USDC_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const USER = "FWBFarytmqKQajUDiqH6VCAJ2bt4d2Q4X4g38zKQehCy";
+    const INPUT_ORACLE = "49zLKETMq34CUC2E2wL1xvv6uN2AUgyhjVX221mjE3Rw";
+    const SOLANA_INPUT_SETTLER = "LiFiRp8RM7nJUZyUYC9FPPpDr7sAy5XPfBN6ABzBgT7";
+    const payload = {
+      order: {
+        user: USER,
+        nonce: "2792426833",
+        originChainId: "1151111081099710",
+        expires: 1_786_896_127,
+        fillDeadline: 1_786_730_527,
+        inputOracle: INPUT_ORACLE,
+        inputs: [[USDC_SOLANA, "1995000"]],
+        outputs: [
+          {
+            oracle: BYTES32_ONE,
+            settler: BYTES32_ONE,
+            chainId: "8453",
+            token: BYTES32_ONE,
+            amount: "1995000",
+            recipient: BYTES32_ONE,
+            callbackData: "0x",
+            context: "0x",
+          },
+        ],
+      },
+      inputSettler: SOLANA_INPUT_SETTLER,
+      sponsorSignature: null,
+      allocatorSignature: null,
+    };
+
+    const parsed = parseOrderStatusPayload(payload);
+    if (!isStandardOrder(parsed.order))
+      throw new Error("Expected standard order");
+
+    // Every address lands on the internal 32-byte hex form and round-trips.
+    expect(bytes32ToSolanaBase58(parsed.order.user)).toBe(USER);
+    expect(bytes32ToSolanaBase58(parsed.order.inputOracle)).toBe(INPUT_ORACLE);
+    expect(bytes32ToSolanaBase58(parsed.inputSettler)).toBe(
+      SOLANA_INPUT_SETTLER,
+    );
+
+    // The mint becomes the same integer `create.ts` builds it as.
+    const input = parsed.order.inputs[0];
+    if (!input) throw new Error("Expected an input");
+    expect(input[0]).toBe(BigInt(solanaBase58ToBytes32(USDC_SOLANA)));
+    expect(input[1]).toBe(1995000n);
+
+    // The hex-namespace output is untouched.
+    const output = parsed.order.outputs[0];
+    if (!output) throw new Error("Expected an output");
+    expect(output.token).toBe(BYTES32_ONE);
+    expect(output.chainId).toBe(8453n);
+  });
+
+  it("keeps a decimal input asset id numeric rather than reading it as base58", () => {
+    // Base58's alphabet contains the digits 1-9, so an EVM token id like "123"
+    // is also a well-formed base58 string. The numeric reading must win.
+    const payload = {
+      data: {
+        order: {
+          user: "0x1111111111111111111111111111111111111111",
+          nonce: "123",
+          originChainId: "8453",
+          expires: 2_000_000_000,
+          fillDeadline: 1_999_999_900,
+          inputOracle: "0x0000000000000000000000000000000000000001",
+          inputs: [["123", "1000000"]],
+          outputs: [],
+        },
+        inputSettler: INPUT_SETTLER,
+      },
+    };
+
+    const parsed = parseOrderStatusPayload(payload);
+    if (!isStandardOrder(parsed.order))
+      throw new Error("Expected standard order");
+    const input = parsed.order.inputs[0];
+    if (!input) throw new Error("Expected an input");
+    expect(input[0]).toBe(123n);
   });
 
   it("throws for invalid payload", () => {

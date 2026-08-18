@@ -12,6 +12,7 @@ import { isStandardOrder } from "../intent/index";
 import {
   bytes32ToSolanaBase58,
   isSolanaBase58Address,
+  solanaBase58ToBytes32,
 } from "../helpers/solana";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
@@ -224,6 +225,51 @@ function toBigIntValue(value: unknown, field: string): bigint {
   throw new Error(`Order payload invalid: ${field}`);
 }
 
+/**
+ * An address-shaped field, in whichever encoding its own namespace uses on the
+ * wire, normalized to this library's internal hex form.
+ *
+ * The order API renders every field in the namespace of the chain it belongs
+ * to — the same convention `toQuoteAddress` writes on the way out — so an order
+ * whose origin or output chain is Solana comes back with `user`, `inputOracle`,
+ * `inputSettler`, mints and recipients as raw base58. Left unconverted they
+ * fail `toHexString` and the import dies on the first such field.
+ *
+ * The two encodings cannot collide: base58's alphabet excludes `0`, so no
+ * base58 address can begin with `0x`. Hex is passed through byte-for-byte,
+ * which leaves EVM and Tron orders parsed exactly as before.
+ */
+function toAddress(value: unknown, field: string): `0x${string}` {
+  if (typeof value === "string" && !value.startsWith("0x")) {
+    try {
+      return solanaBase58ToBytes32(value.trim());
+    } catch {
+      throw new Error(`Order payload invalid: ${field}`);
+    }
+  }
+  return toHexString(value, field);
+}
+
+/**
+ * The asset slot of an input tuple: a uint256 token id on EVM and Tron, a
+ * base58 mint on Solana. Base58 decodes to the same 32-byte key the rest of the
+ * library carries as an integer (see `create.ts`, which builds a Solana order's
+ * input as `BigInt(mintHex)`), so both encodings land on one representation.
+ *
+ * The numeric reading is tried first. Base58's alphabet also contains the
+ * digits 1-9, so a decimal id is spellable in it — and every existing order
+ * means the number.
+ */
+function toAssetId(value: unknown, field: string): bigint {
+  if (
+    typeof value === "string" &&
+    !/^(0x[0-9a-fA-F]+|[0-9]+)$/.test(value.trim())
+  ) {
+    return BigInt(toAddress(value, field));
+  }
+  return toBigIntValue(value, field);
+}
+
 function toNumberValue(value: unknown, field: string): number {
   const parsed =
     typeof value === "number"
@@ -253,12 +299,12 @@ function normalizeOutputs(value: unknown) {
     }
     const o = output as Record<string, unknown>;
     return {
-      oracle: toHexString(o.oracle, `outputs[${index}].oracle`),
-      settler: toHexString(o.settler, `outputs[${index}].settler`),
+      oracle: toAddress(o.oracle, `outputs[${index}].oracle`),
+      settler: toAddress(o.settler, `outputs[${index}].settler`),
       chainId: toBigIntValue(o.chainId, `outputs[${index}].chainId`),
-      token: toHexString(o.token, `outputs[${index}].token`),
+      token: toAddress(o.token, `outputs[${index}].token`),
       amount: toBigIntValue(o.amount, `outputs[${index}].amount`),
-      recipient: toHexString(o.recipient, `outputs[${index}].recipient`),
+      recipient: toAddress(o.recipient, `outputs[${index}].recipient`),
       callbackData: toHexString(
         o.callbackData ?? "0x",
         `outputs[${index}].callbackData`,
@@ -272,18 +318,18 @@ function normalizeStandardOrder(order: Record<string, unknown>): StandardOrder {
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toHexString(order.user, "order.user"),
+    user: toAddress(order.user, "order.user"),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     originChainId: toBigIntValue(order.originChainId, "order.originChainId"),
     expires: toNumberValue(order.expires, "order.expires"),
     fillDeadline: toNumberValue(order.fillDeadline, "order.fillDeadline"),
-    inputOracle: toHexString(order.inputOracle, "order.inputOracle"),
+    inputOracle: toAddress(order.inputOracle, "order.inputOracle"),
     inputs: order.inputs.map((input, index) => {
       if (!Array.isArray(input) || input.length !== 2) {
         throw new Error(`Order payload invalid: inputs[${index}]`);
       }
       return [
-        toBigIntValue(input[0], `inputs[${index}][0]`),
+        toAssetId(input[0], `inputs[${index}][0]`),
         toBigIntValue(input[1], `inputs[${index}][1]`),
       ];
     }),
@@ -297,11 +343,11 @@ function normalizeMultichainOrder(
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toHexString(order.user, "order.user"),
+    user: toAddress(order.user, "order.user"),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     expires: toNumberValue(order.expires, "order.expires"),
     fillDeadline: toNumberValue(order.fillDeadline, "order.fillDeadline"),
-    inputOracle: toHexString(order.inputOracle, "order.inputOracle"),
+    inputOracle: toAddress(order.inputOracle, "order.inputOracle"),
     outputs: normalizeOutputs(order.outputs),
     inputs: order.inputs.map((input, index) => {
       if (!input || typeof input !== "object") {
@@ -320,10 +366,7 @@ function normalizeMultichainOrder(
             );
           }
           return [
-            toBigIntValue(
-              tuple[0],
-              `inputs[${index}].inputs[${tupleIndex}][0]`,
-            ),
+            toAssetId(tuple[0], `inputs[${index}].inputs[${tupleIndex}][0]`),
             toBigIntValue(
               tuple[1],
               `inputs[${index}].inputs[${tupleIndex}][1]`,
@@ -367,7 +410,7 @@ export function parseOrderStatusPayload(payload: unknown): OrderContainer {
     : normalizeMultichainOrder(rawOrder);
 
   return {
-    inputSettler: toHexString(envelope.inputSettler, "inputSettler"),
+    inputSettler: toAddress(envelope.inputSettler, "inputSettler"),
     order,
     sponsorSignature: normalizeSignature(envelope.sponsorSignature),
     allocatorSignature: normalizeSignature(envelope.allocatorSignature),
