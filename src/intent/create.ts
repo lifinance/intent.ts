@@ -189,6 +189,7 @@ export class Intent {
             getOracle: this.getOracle,
             verifier: this.verifier,
             inputChainId: inputChain,
+            inputNamespace,
             sameChain,
             recipient,
             currentTime,
@@ -231,6 +232,7 @@ export class Intent {
             getOracle: this.getOracle,
             verifier: this.verifier,
             inputChainId: inputChain,
+            inputNamespace,
             sameChain,
             recipient,
             currentTime,
@@ -283,6 +285,7 @@ export class Intent {
             getOracle: this.getOracle,
             verifier: this.verifier,
             inputChainId: inputChain,
+            inputNamespace,
             sameChain,
             recipient,
             currentTime,
@@ -352,6 +355,9 @@ export class Intent {
         getOracle: this.getOracle,
         verifier: this.verifier,
         inputChainId: firstInput.token.chainId,
+        // Multichain orders are EVM-only: a Solana or Tron input is rejected
+        // upstream, so the input namespace is always eip155 here.
+        inputNamespace: "eip155",
         sameChain: false,
         recipient,
         currentTime,

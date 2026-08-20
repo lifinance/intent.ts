@@ -6,6 +6,7 @@ import {
   SOLANA_DEVNET_CHAIN_ID,
   SOLANA_DEVNET_INPUT_SETTLER_ESCROW,
   SOLANA_OUTPUT_SETTLER_PDA,
+  SOLANA_POLYMER_ORACLE_PDA,
   SOLANA_POLYMER_ORACLE_PROGRAM,
   SOLANA_TESTNET_CHAIN_ID,
   TRON_MAINNET_CHAIN_ID,
@@ -257,6 +258,30 @@ describe("Intent", () => {
     expect(multi).toBeInstanceOf(MultichainOrderIntent);
   });
 
+  it("routes a mixed local/remote output order entirely through the cross-chain rule", () => {
+    // Documents existing behaviour, not a new decision: `sameChain` is computed
+    // for the whole order (isSameChain returns false as soon as the outputs span
+    // two chains), so the output that happens to sit on the input chain gets the
+    // cross-chain oracle rather than the settler.
+    const intent = new Intent(
+      makeEscrowOptions(
+        [ctx(ETH_USDC, 2n)],
+        [ctx(ETH_USDC, 1n), ctx(ARB_USDC, 1n)],
+      ),
+      intentDeps,
+    );
+    const order = intent.singlechain().asOrder();
+
+    expect(order.outputs[0]!.chainId).toBe(CHAIN_ID_ETHEREUM);
+    expect(order.outputs[0]!.oracle).toBe(
+      addressToBytes32(TEST_POLYMER_ORACLE),
+    );
+    expect(order.outputs[0]!.oracle).not.toBe(addressToBytes32(COIN_FILLER));
+    expect(order.outputs[1]!.oracle).toBe(
+      addressToBytes32(TEST_POLYMER_ORACLE),
+    );
+  });
+
   describe("Solana singlechain", () => {
     const SOLANA_DEVNET_ORACLE =
       "0x0000003E06000007A224AeE90052fA6bb46d43C9" as const;
@@ -336,6 +361,96 @@ describe("Intent", () => {
       );
 
       expect(() => intent.singlechain()).toThrow("Unsupported Solana chain id");
+    });
+
+    it("names the EVM output chain's polymer oracle on a Solana->EVM output", () => {
+      // The input chain's oracle is a 32-byte Solana PDA, and the EVM output
+      // settler reverts HasDirtyBits() on it before it moves any tokens
+      // (OutputSettlerBase.sol:175), so a Solana-origin order must name the
+      // OUTPUT chain's oracle. Safe because oracle_polymer::receive_attest
+      // keys the attestation by output.oracle exactly as declared.
+      const getOracle = mock(solanaIntentDeps.getOracle);
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
+        { getOracle },
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.outputs[0]!.oracle).toBe(
+        addressToBytes32(TEST_POLYMER_ORACLE),
+      );
+      expect(order.outputs[0]!.oracle).not.toBe(SOLANA_DEVNET_ORACLE);
+      // The upper 12 bytes must be zero or the EVM fill reverts. Only an
+      // on-chain call would otherwise catch this.
+      expect(order.outputs[0]!.oracle.slice(0, 26)).toBe(
+        `0x${"00".repeat(12)}`,
+      );
+      expect(getOracle).toHaveBeenCalledWith("polymer", CHAIN_ID_ARBITRUM);
+      // The input side is unchanged: still the Solana oracle PDA.
+      expect(order.inputOracle).toBe(SOLANA_DEVNET_ORACLE);
+    });
+
+    it("never puts the 32-byte solana oracle PDA into an EVM output", () => {
+      // The regression this guards: the real deployed input oracle is a full
+      // 32-byte PDA. Any non-zero upper 12 bytes make the EVM fill revert.
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
+        {
+          getOracle(verifier, chainId) {
+            if (verifier !== "polymer") return undefined;
+            if (chainId === SOLANA_DEVNET_CHAIN_ID)
+              return SOLANA_POLYMER_ORACLE_PDA;
+            return TEST_POLYMER_ORACLE;
+          },
+        },
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.inputOracle).toBe(SOLANA_POLYMER_ORACLE_PDA);
+      expect(order.outputs[0]!.oracle).not.toBe(SOLANA_POLYMER_ORACLE_PDA);
+      expect(order.outputs[0]!.oracle).toBe(
+        addressToBytes32(TEST_POLYMER_ORACLE),
+      );
+    });
+
+    it("names the Tron output chain's oracle on a Solana->Tron output", () => {
+      // Tron's PolymerOracle is not the CREATE2-identical EVM address, so
+      // "the output chain's oracle" must be resolved per chain.
+      const TRON_ORACLE = "0xfa5fabd73c86e1822fda06418c332800c0d7d73b" as const;
+      const TRON_USDC: CoreToken = {
+        address: "0xab11111111111111111111111111111111111111",
+        name: "USDC",
+        chainId: TRON_MAINNET_CHAIN_ID,
+        decimals: 6,
+        chainNamespace: "tron",
+      };
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(TRON_USDC, 1_000_000n)],
+          { outputRecipient: b32("c") },
+        ),
+        {
+          getOracle(verifier, chainId) {
+            if (verifier !== "polymer") return undefined;
+            if (chainId === TRON_MAINNET_CHAIN_ID) return TRON_ORACLE;
+            if (chainId === SOLANA_DEVNET_CHAIN_ID) return SOLANA_DEVNET_ORACLE;
+            return undefined;
+          },
+        },
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.outputs[0]!.oracle).toBe(addressToBytes32(TRON_ORACLE));
+      expect(order.outputs[0]!.settler).toBe(
+        addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+      );
     });
 
     it("names the polymer PROGRAM ID on an EVM->Solana output", () => {
@@ -421,6 +536,43 @@ describe("Intent", () => {
       decimals: 6,
       chainNamespace: "tron",
     };
+
+    it("keeps the tron INPUT chain's oracle on a Tron->EVM output", () => {
+      // Anti-regression for the Solana-input change: an EVM-shaped input still
+      // names its own oracle, and Tron's is not the EVM address.
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(TRON_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+        ),
+        tronIntentDeps,
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.outputs[0]!.oracle).toBe(addressToBytes32(TRON_ORACLE));
+      expect(order.outputs[0]!.oracle).not.toBe(
+        addressToBytes32(TEST_POLYMER_ORACLE),
+      );
+    });
+
+    it("keeps the EVM INPUT chain's oracle on an EVM->Tron output", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(ARB_USDC, 1_000_000n)],
+          [ctx(TRON_USDC, 1_000_000n)],
+          { outputRecipient: b32("c") },
+        ),
+        tronIntentDeps,
+      );
+      const order = intent.singlechain().asOrder();
+
+      expect(order.outputs[0]!.oracle).toBe(
+        addressToBytes32(TEST_POLYMER_ORACLE),
+      );
+      expect(order.outputs[0]!.settler).toBe(
+        addressToBytes32(TRON_MAINNET_OUTPUT_SETTLER),
+      );
+    });
 
     it("returns StandardEVMIntent with tron namespace for a tron input token", () => {
       const intent = new Intent(

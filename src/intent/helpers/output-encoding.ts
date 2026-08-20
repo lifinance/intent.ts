@@ -2,7 +2,7 @@ import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
 import { COIN_FILLER } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
-import type { MandateOutput, TokenContext } from "../../types";
+import type { MandateOutput, Namespace, TokenContext } from "../../types";
 import {
   ONE_MINUTE,
   outputSettlerForSolana,
@@ -28,6 +28,7 @@ export function buildMandateOutputs(options: {
   getOracle: IntentDeps["getOracle"];
   verifier: CoreVerifier;
   inputChainId: bigint;
+  inputNamespace: Namespace;
   sameChain: boolean;
   recipient: `0x${string}`;
   currentTime: number;
@@ -38,6 +39,7 @@ export function buildMandateOutputs(options: {
     getOracle,
     verifier,
     inputChainId,
+    inputNamespace,
     sameChain,
     recipient,
     currentTime,
@@ -89,9 +91,31 @@ export function buildMandateOutputs(options: {
       // it for a Solana output produces an order that fills and can then never
       // be proven.
       outputOracle = polymerOracleProgramForSolana(token.chainId);
+    } else if (verifier === "polymer" && inputNamespace === "solana") {
+      // Solana INPUT, EVM/Tron output. The input chain's oracle is a 32-byte
+      // PDA, and the EVM output settler rejects it outright:
+      // `_fill` calls `LibAddress.validatedCleanAddress(uint256(output.oracle))`
+      // which reverts `HasDirtyBits()` on any value with non-zero upper 12
+      // bytes (OutputSettlerBase.sol:175, mirrored on emitNotFilled at :322).
+      // So the input-chain-oracle rule below cannot apply here.
+      //
+      // The output chain's own oracle is safe: for a Solana input,
+      // `oracle_polymer::receive_attest` keys the attestation by `output.oracle`
+      // exactly as the order declares it, and `validate_fill` reads back the
+      // same declared value (input_settler_base/src/base.rs:193) — so any
+      // clean-address value is self-consistent on lookup.
+      const outputOracleAddress = getOracle(verifier, token.chainId);
+      if (!outputOracleAddress)
+        throw new Error(
+          `No oracle configured for verifier "${verifier}" on chain ${token.chainId}`,
+        );
+      outputOracle = addressToBytes32(outputOracleAddress);
     } else if (verifier === "polymer") {
       // Polymer stores proofs under address(this) on the input chain, so
       // output.oracle must be the input chain's oracle for the lookup to match.
+      // Only valid for an EVM-shaped input: Tron's oracle is a different
+      // address from the CREATE2-identical EVM one, hence "the input chain's",
+      // not a constant.
       const inputOracle = getOracle(verifier, inputChainId);
       if (!inputOracle)
         throw new Error(
