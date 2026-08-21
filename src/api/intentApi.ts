@@ -8,6 +8,7 @@ import type {
   Signature,
   StandardOrder,
 } from "../types/index";
+import { bytes32ToAddress } from "../helpers/convert";
 import { isStandardOrder } from "../intent/index";
 import {
   bytes32ToSolanaBase58,
@@ -136,10 +137,32 @@ type GetQuoteResponse = {
     partialFill: boolean;
     failureHandling: string;
     metadata: {
-      exclusiveFor: `0x${string}` | `0x${string}`[] | null;
+      // Rendered in the INPUT chain's own form: `0x` hex on EVM, `T...` on
+      // Tron, base58 on Solana — not necessarily hex.
+      exclusiveFor: string | string[] | null;
     };
   }[];
 };
+
+/**
+ * Normalizes a solver identity to the form its own chain names it by.
+ *
+ * `buildMandateOutputs` accepts the exclusive solver either as an address or as
+ * the bytes32 it is padded to on the wire, so both forms legitimately reach a
+ * caller. The quote API names solvers the way the chain does — a 20-byte
+ * address on EVM and Tron — and a padded value there would reach the order
+ * service as an address it cannot parse. Solana keys are 32 bytes in both
+ * places and pass straight through.
+ */
+function toSolverAddress(
+  solver: `0x${string}`,
+  namespace: Namespace = "eip155",
+): `0x${string}` {
+  if (namespace === "solana") return solver;
+  return /^0x[0-9a-fA-F]{64}$/.test(solver)
+    ? (bytes32ToAddress(solver) as `0x${string}`)
+    : solver;
+}
 
 function toCaip2Chain(
   chainId: number | bigint,
@@ -546,8 +569,21 @@ export class IntentApi {
     if (preference !== undefined) intent.preference = preference;
     if (partialFill !== undefined) intent.partialFill = partialFill;
     if (failureHandling !== undefined) intent.failureHandling = failureHandling;
+    // The order service normalizes `metadata.exclusiveFor` against the quote's
+    // INPUT chain, so the solver has to reach it in the input namespace's own
+    // form — base58 for a Solana origin, hex elsewhere. Every other address
+    // field goes through `toQuoteAddress`; this one used to be passed through
+    // raw, which sent a 32-byte solver as hex and matched no solver at all.
+    const inputNamespace = inputs[0]?.namespace;
     if (exclusiveFor && exclusiveFor.length > 0)
-      intent.metadata = { exclusiveFor };
+      intent.metadata = {
+        exclusiveFor: exclusiveFor.map((solver) =>
+          toQuoteAddress(
+            toSolverAddress(solver, inputNamespace),
+            inputNamespace,
+          ),
+        ),
+      };
 
     const rq = {
       user: {

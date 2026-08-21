@@ -20,6 +20,52 @@ export function encodeOutputs(outputs: MandateOutput[]) {
 }
 
 /**
+ * Validates the exclusive solver against the INPUT chain's address space and
+ * returns it as bytes32.
+ *
+ * The output settler treats the solver as an opaque bytes32 — it only compares
+ * it to `exclusive_for` and records it in the fill
+ * (output_settler_simple/src/utils/resolve_output.rs:62-71). It is the INPUT
+ * settler that pays the solver out, so the identity has to be one that chain
+ * can recognise:
+ *
+ * - Solana inputs finalise only for the signer named in the fill
+ *   (`solve_params[0].solver == solver.key()`, input_settler_escrow finalise),
+ *   so a zero-padded EVM address is a key that cannot sign. Such an order
+ *   opens, escrows the input, can be filled, and can then never be settled —
+ *   the fill record on the output chain pins the wrong identity permanently.
+ * - EVM and Tron inputs pay out to the low 20 bytes, so a 32-byte Solana key
+ *   would be silently truncated to an address nobody holds.
+ *
+ * The 12-leading-zero-byte test separates the two spaces: EVM and Tron
+ * addresses always have them, an ed25519 key has them with probability 2^-96.
+ * It answers "which address space is this", not "can this key sign" — an
+ * off-curve Solana pubkey (a PDA, a program id) passes it, and choosing a
+ * solver identity that can actually sign stays the caller's job.
+ */
+function exclusiveForForInput(
+  exclusiveFor: `0x${string}`,
+  inputNamespace: Namespace,
+): `0x${string}` {
+  if (!/^0x([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(exclusiveFor)) {
+    throw new Error(`ExclusiveFor not formatted correctly ${exclusiveFor}`);
+  }
+  const bytes32 = addressToBytes32(exclusiveFor);
+  const isEvmShaped = bytes32.slice(2, 26) === "0".repeat(24);
+  if (inputNamespace === "solana" && isEvmShaped) {
+    throw new Error(
+      `ExclusiveFor ${exclusiveFor} is not a Solana pubkey: a solana-origin order finalises only for the solver that signs on Solana, so a padded EVM address makes the order fillable but impossible to settle. Pass the solver's 32-byte pubkey (solanaBase58ToBytes32).`,
+    );
+  }
+  if (inputNamespace !== "solana" && !isEvmShaped) {
+    throw new Error(
+      `ExclusiveFor ${exclusiveFor} is not a ${inputNamespace} address: the ${inputNamespace} input settler pays out to the low 20 bytes, so a 32-byte key would be truncated to an address nobody holds.`,
+    );
+  }
+  return bytes32;
+}
+
+/**
  * recipient must be a bytes32-padded address (32 bytes, 0x-prefixed).
  */
 export function buildMandateOutputs(options: {
@@ -32,6 +78,8 @@ export function buildMandateOutputs(options: {
   sameChain: boolean;
   recipient: `0x${string}`;
   currentTime: number;
+  /** Exclusivity window in seconds from `currentTime`. Defaults to 60. */
+  exclusivity?: number;
 }): MandateOutput[] {
   const {
     exclusiveFor,
@@ -43,28 +91,18 @@ export function buildMandateOutputs(options: {
     sameChain,
     recipient,
     currentTime,
+    exclusivity = ONE_MINUTE,
   } = options;
-
-  if (exclusiveFor) {
-    // 20-byte EVM/Tron address or a 32-byte Solana solver pubkey. The output
-    // settler compares `exclusive_for` against the raw 32-byte solver
-    // identity (output_settler_simple/src/utils/resolve_output.rs:62-71), so
-    // restricting this to 20 bytes makes exclusive fills structurally
-    // impossible on Solana outputs.
-    const formattedCorrectly = /^0x([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/.test(
-      exclusiveFor,
-    );
-    if (!formattedCorrectly) {
-      throw new Error(`ExclusiveFor not formatted correctly ${exclusiveFor}`);
-    }
-  }
 
   let context: `0x${string}` = "0x";
   if (exclusiveFor) {
-    const paddedExclusiveFor = addressToBytes32(exclusiveFor);
+    const exclusiveForBytes32 = exclusiveForForInput(
+      exclusiveFor,
+      inputNamespace,
+    );
     context = encodePacked(
       ["bytes1", "bytes32", "uint32"],
-      ["0xe0", paddedExclusiveFor, currentTime + ONE_MINUTE],
+      ["0xe0", exclusiveForBytes32, currentTime + exclusivity],
     );
   }
 
