@@ -84,13 +84,26 @@ function ctx(token: CoreToken, amount: bigint): TokenContext {
   return { token, amount };
 }
 
+// The exclusive solver lives in the INPUT chain's address space (only the input
+// settler pays it out), so the default fixture solver follows the first input.
+const TEST_SOLANA_SOLVER =
+  "0x3b442cb3912157f13a933d0134282d032b5ffecd01a2dbf1b7790608df002ea7" as const;
+
+function defaultExclusiveFor(
+  inputTokens: TokenContext[],
+): `0x${string}` | undefined {
+  return inputTokens[0]?.token.chainNamespace === "solana"
+    ? TEST_SOLANA_SOLVER
+    : TEST_USER;
+}
+
 function makeEscrowOptions(
   inputTokens: TokenContext[],
   outputTokens: TokenContext[],
   overrides: Partial<CreateIntentOptionsEscrow> = {},
 ): CreateIntentOptionsEscrow {
   return {
-    exclusiveFor: TEST_USER,
+    exclusiveFor: defaultExclusiveFor(inputTokens),
     inputTokens,
     outputTokens,
     verifier: "polymer",
@@ -495,12 +508,12 @@ describe("Intent", () => {
     });
 
     it("keeps a 32-byte solana exclusiveFor unpadded in the context", () => {
-      const solanaSolver = SOLANA_OUTPUT_SETTLER_PDA;
+      const solanaSolver = TEST_SOLANA_SOLVER;
       const intent = new Intent(
         makeEscrowOptions(
-          [ctx(ARB_USDC, 1_000_000n)],
           [ctx(SOLANA_USDC, 1_000_000n)],
-          { outputRecipient: b32("c"), exclusiveFor: solanaSolver },
+          [ctx(ARB_USDC, 1_000_000n)],
+          { outputRecipient: TEST_USER, exclusiveFor: solanaSolver },
         ),
         { getOracle: () => TEST_POLYMER_ORACLE },
       );
@@ -510,6 +523,41 @@ describe("Intent", () => {
       expect(order.outputs[0]!.context.slice(0, 4)).toBe("0xe0");
       expect(order.outputs[0]!.context.slice(4, 68)).toBe(
         solanaSolver.slice(2),
+      );
+    });
+
+    // The failure this rejects is order
+    // 0x2947daf76e839afdd36972307f937d2dd80bea17c264f242b6fc78697168dcd3: a
+    // Solana-origin order exclusive to an EVM address. It filled on Base and
+    // can never be finalised, because the escrow pays out only to the solver
+    // that signs on Solana.
+    it("rejects an EVM exclusiveFor on a solana-origin order", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+          { outputRecipient: TEST_USER, exclusiveFor: TEST_USER },
+        ),
+        { getOracle: () => TEST_POLYMER_ORACLE },
+      );
+
+      expect(() => intent.singlechain()).toThrow("is not a Solana pubkey");
+    });
+
+    it("applies a custom exclusivity window to a solana-origin order", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(SOLANA_USDC, 1_000_000n)],
+          [ctx(ARB_USDC, 1_000_000n)],
+          { outputRecipient: TEST_USER, exclusivity: 300 },
+        ),
+        { getOracle: () => TEST_POLYMER_ORACLE },
+      );
+      const order = intent.singlechain().asOrder();
+
+      // Trailing uint32 of the exclusive-limit context is the window's end.
+      expect(parseInt(order.outputs[0]!.context.slice(68, 76), 16)).toBe(
+        TEST_NOW_SECONDS + 300,
       );
     });
   });

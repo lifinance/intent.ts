@@ -572,6 +572,75 @@ describe("IntentApi HTTP", () => {
       );
     });
 
+    // The order service normalizes metadata.exclusiveFor against the quote's
+    // INPUT chain, so the solver has to arrive in that chain's own form.
+    it("sends the exclusive solver in the input chain's form", async () => {
+      const captured = captureQuoteBody();
+      const solverBytes32 =
+        "0x3b442cb3912157f13a933d0134282d032b5ffecd01a2dbf1b7790608df002ea7";
+      await new IntentApi(false).getQuotes({
+        user: USDC_MINT,
+        userChainId: SOLANA_CHAIN_ID,
+        userNamespace: "solana",
+        exclusiveFor: [solverBytes32],
+        inputs: [
+          {
+            sender: USDC_MINT,
+            asset: USDC_MINT,
+            chainId: SOLANA_CHAIN_ID,
+            namespace: "solana",
+            amount: 1_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver: "0x1111111111111111111111111111111111111111",
+            asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            chainId: 8453,
+            amount: 0n,
+          },
+        ],
+      });
+
+      expect(JSON.parse(captured.body).intent.metadata.exclusiveFor).toEqual([
+        bytes32ToSolanaBase58(solverBytes32),
+      ]);
+    });
+
+    it("unpads a bytes32 solver on an EVM-origin request", async () => {
+      // `buildMandateOutputs` takes the solver as an address or as the bytes32
+      // it is padded to, so both forms legitimately reach a caller; the quote
+      // API only knows the address form on EVM.
+      const captured = captureQuoteBody();
+      await new IntentApi(false).getQuotes({
+        user: "0x1111111111111111111111111111111111111111",
+        userChainId: 8453,
+        exclusiveFor: [
+          "0x0000000000000000000000007bb2b9b2cf209b88850cb744d9e38297905549c9",
+        ],
+        inputs: [
+          {
+            sender: "0x1111111111111111111111111111111111111111",
+            asset: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            chainId: 8453,
+            amount: 1_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver: "0x1111111111111111111111111111111111111111",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            chainId: 42161,
+            amount: 0n,
+          },
+        ],
+      });
+
+      expect(JSON.parse(captured.body).intent.metadata.exclusiveFor).toEqual([
+        "0x7bb2b9b2cf209b88850cb744d9e38297905549c9",
+      ]);
+    });
+
     it("passes native base58 through unchanged", async () => {
       const captured = captureQuoteBody();
       await new IntentApi(false).getQuotes({

@@ -267,6 +267,102 @@ describe("output encoding helpers", () => {
     ).toThrow("ExclusiveFor not formatted correctly");
   });
 
+  // The failure this guard exists for: order
+  // 0x2947daf76e839afdd36972307f937d2dd80bea17c264f242b6fc78697168dcd3 was a
+  // solana-origin order carrying a padded EVM solver. It filled on Base and can
+  // never be finalised on Solana, because the escrow pays out only to the
+  // signer named in the fill.
+  it("rejects a padded EVM solver on a solana-origin intent", () => {
+    expect(() =>
+      buildMandateOutputs({
+        exclusiveFor: "0x7bb2b9b2cf209b88850cb744d9e38297905549c9",
+        outputTokens,
+        getOracle() {
+          return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+        },
+        verifier: "polymer",
+        inputChainId: SOLANA_MAINNET_CHAIN_ID,
+        inputNamespace: "solana",
+        sameChain: false,
+        recipient: "0x1111111111111111111111111111111111111111",
+        currentTime: 1_700_000_000,
+      }),
+    ).toThrow("is not a Solana pubkey");
+  });
+
+  it("accepts a 32-byte solver on a solana-origin intent and leaves it unpadded", () => {
+    const solver =
+      "0x3b442cb3912157f13a933d0134282d032b5ffecd01a2dbf1b7790608df002ea7";
+    const output = buildMandateOutputs({
+      exclusiveFor: solver,
+      outputTokens,
+      getOracle() {
+        return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+      },
+      verifier: "polymer",
+      inputChainId: SOLANA_MAINNET_CHAIN_ID,
+      inputNamespace: "solana",
+      sameChain: false,
+      recipient: "0x1111111111111111111111111111111111111111",
+      currentTime: 1_700_000_000,
+    });
+    const [first] = output;
+    if (!first) throw new Error("Expected one output");
+
+    expect(first.context).toBe(
+      encodePacked(
+        ["bytes1", "bytes32", "uint32"],
+        ["0xe0", solver, 1_700_000_060],
+      ),
+    );
+  });
+
+  it("rejects a 32-byte solver on an EVM-origin intent — the settler truncates to 20 bytes", () => {
+    expect(() =>
+      buildMandateOutputs({
+        exclusiveFor:
+          "0x3b442cb3912157f13a933d0134282d032b5ffecd01a2dbf1b7790608df002ea7",
+        outputTokens,
+        getOracle() {
+          return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+        },
+        verifier: "polymer",
+        inputChainId: 1n,
+        inputNamespace: "eip155",
+        sameChain: false,
+        recipient: "0x1111111111111111111111111111111111111111",
+        currentTime: 1_700_000_000,
+      }),
+    ).toThrow("is not a eip155 address");
+  });
+
+  it("honours a custom exclusivity window", () => {
+    const solver = "0x7bb2b9b2cf209b88850cb744d9e38297905549c9";
+    const output = buildMandateOutputs({
+      exclusiveFor: solver,
+      outputTokens,
+      getOracle() {
+        return "0x0000003E06000007A224AeE90052fA6bb46d43C9";
+      },
+      verifier: "polymer",
+      inputChainId: 1n,
+      inputNamespace: "eip155",
+      sameChain: false,
+      recipient: "0x1111111111111111111111111111111111111111",
+      currentTime: 1_700_000_000,
+      exclusivity: 300,
+    });
+    const [first] = output;
+    if (!first) throw new Error("Expected one output");
+
+    expect(first.context).toBe(
+      encodePacked(
+        ["bytes1", "bytes32", "uint32"],
+        ["0xe0", addressToBytes32(solver), 1_700_000_300],
+      ),
+    );
+  });
+
   it("uses getOracle for non-polymer verifier cross-chain intent", () => {
     const wormholeOracle = "0x1234567890abcdef1234567890abcdef12345678";
     const output = buildMandateOutputs({

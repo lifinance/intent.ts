@@ -26,6 +26,12 @@ type CreateIntentOptionsBase = {
    * Defaults to 44 hours. Should be less than or equal to `expiry`.
    */
   fillDeadline?: number;
+  /**
+   * Override the exclusivity window, in seconds from creation time. Only used
+   * when `exclusiveFor` is set: until it elapses, the output settler accepts a
+   * fill from that solver alone. Defaults to 60 seconds.
+   */
+  exclusivity?: number;
 };
 
 export type CreateIntentOptionsEscrow = CreateIntentOptionsBase & {

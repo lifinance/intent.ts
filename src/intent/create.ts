@@ -16,6 +16,7 @@ import { buildMandateOutputs } from "./helpers/output-encoding";
 import {
   ONE_DAY,
   ONE_HOUR,
+  ONE_MINUTE,
   inputSettlerForLock,
   inputSettlerForSolana,
   outputSettlerForSolana,
@@ -44,6 +45,8 @@ export class Intent {
   private expiry = 2 * ONE_DAY;
   /** Fill-deadline duration in seconds, relative to intent creation time. Defaults to 44 hours. */
   private fillDeadline = 44 * ONE_HOUR;
+  /** Exclusivity window in seconds, relative to intent creation time. Defaults to 1 minute. */
+  private exclusivity = ONE_MINUTE;
 
   constructor(opts: CreateIntentOptions, deps: IntentDeps) {
     this.lock = opts.lock;
@@ -56,6 +59,7 @@ export class Intent {
     this.outputRecipient = opts.outputRecipient;
     if (opts.expiry !== undefined) this.expiry = opts.expiry;
     if (opts.fillDeadline !== undefined) this.fillDeadline = opts.fillDeadline;
+    if (opts.exclusivity !== undefined) this.exclusivity = opts.exclusivity;
   }
 
   /**
@@ -73,6 +77,16 @@ export class Intent {
    */
   setFillDeadline(seconds: number) {
     this.fillDeadline = seconds;
+    return this;
+  }
+
+  /**
+   * Override the exclusivity window (seconds from creation time) for this
+   * intent. Only takes effect when `exclusiveFor` is set. Returns `this` for
+   * chaining.
+   */
+  setExclusivity(seconds: number) {
+    this.exclusivity = seconds;
     return this;
   }
 
@@ -193,6 +207,7 @@ export class Intent {
             sameChain,
             recipient,
             currentTime,
+            exclusivity: this.exclusivity,
           }),
         };
         return new StandardSolanaIntent(
@@ -236,6 +251,7 @@ export class Intent {
             sameChain,
             recipient,
             currentTime,
+            exclusivity: this.exclusivity,
           }),
         };
         return new StandardEVMIntent(
@@ -289,6 +305,7 @@ export class Intent {
             sameChain,
             recipient,
             currentTime,
+            exclusivity: this.exclusivity,
           }),
         };
         return new StandardEVMIntent(
@@ -361,6 +378,7 @@ export class Intent {
         sameChain: false,
         recipient,
         currentTime,
+        exclusivity: this.exclusivity,
       }),
       inputs,
     };
