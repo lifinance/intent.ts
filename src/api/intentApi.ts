@@ -86,6 +86,8 @@ type GetQuoteOptions = {
   swapType?: "exact-input" | "exact-output";
   minValidUntil?: number;
   exclusiveFor?: `0x${string}`[];
+  /** Accepted EVM oracle contracts on both sides of a cross-chain route. */
+  oracle?: { chainId: number | bigint; address: `0x${string}` }[];
   /**
    * Optional integrator key sent as the `X-Integrator-Key` header on the quote
    * request. Lets an integrator receive integrator-specific quotes.
@@ -539,6 +541,7 @@ export class IntentApi {
       partialFill,
       failureHandling,
       integratorKey,
+      oracle,
     } = options;
 
     const intent: Record<string, unknown> = {
@@ -569,21 +572,38 @@ export class IntentApi {
     if (preference !== undefined) intent.preference = preference;
     if (partialFill !== undefined) intent.partialFill = partialFill;
     if (failureHandling !== undefined) intent.failureHandling = failureHandling;
-    // The order service normalizes `metadata.exclusiveFor` against the quote's
-    // INPUT chain, so the solver has to reach it in the input namespace's own
-    // form — base58 for a Solana origin, hex elsewhere. Every other address
-    // field goes through `toQuoteAddress`; this one used to be passed through
-    // raw, which sent a 32-byte solver as hex and matched no solver at all.
+    const metadata: Record<string, unknown> = {};
     const inputNamespace = inputs[0]?.namespace;
-    if (exclusiveFor && exclusiveFor.length > 0)
-      intent.metadata = {
-        exclusiveFor: exclusiveFor.map((solver) =>
-          toQuoteAddress(
-            toSolverAddress(solver, inputNamespace),
-            inputNamespace,
-          ),
-        ),
-      };
+    if (exclusiveFor && exclusiveFor.length > 0) {
+      metadata.exclusiveFor = exclusiveFor.map((solver) =>
+        toQuoteAddress(toSolverAddress(solver, inputNamespace), inputNamespace),
+      );
+    }
+    if (oracle !== undefined) {
+      metadata.oracle = oracle.map(({ chainId, address }) => {
+        if (
+          (typeof chainId === "number" && !Number.isSafeInteger(chainId)) ||
+          chainId <= 0
+        ) {
+          throw new Error("Oracle chain ID must be a positive EVM integer");
+        }
+        if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+          throw new Error("Oracle contract must be a 20-byte EVM address");
+        }
+        if (
+          [...inputs, ...outputs].some(
+            (item) =>
+              BigInt(item.chainId) === BigInt(chainId) &&
+              item.namespace !== undefined &&
+              item.namespace !== "eip155",
+          )
+        ) {
+          throw new Error("Oracle filters support EVM chains only");
+        }
+        return { chain: toCaip2Chain(chainId, "eip155"), address };
+      });
+    }
+    if (Object.keys(metadata).length > 0) intent.metadata = metadata;
 
     const rq = {
       user: {
