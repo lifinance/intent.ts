@@ -30,10 +30,7 @@ internally. Convert native Solana addresses before building an intent, and
 convert back to base58 when displaying them:
 
 ```ts
-import {
-  bytes32ToSolanaBase58,
-  solanaBase58ToBytes32,
-} from "@lifi/intent";
+import { bytes32ToSolanaBase58, solanaBase58ToBytes32 } from "@lifi/intent";
 
 const recipient = solanaBase58ToBytes32(
   "FWBFarytmqKQajUDiqH6VCAJ2bt4d2Q4X4g38zKQehCy",
@@ -205,3 +202,7 @@ These utilities are the core gate for normalizing and validating inbound order d
 - `src/validation.ts`
 - `src/api/intentApi.ts`
 - `src/typedMessage.ts`
+
+### Explicit EVM oracle quotes
+
+Pass `oracle: [{ chainId: 1, address: vowAdapter }, { chainId: 8453, address: vowAdapter }]` to `IntentApi.getQuotes` to require the listed oracle contracts on both sides of a cross-chain route. The SDK sends these as `intent.metadata.oracle` with `eip155` chain identifiers, alongside any `exclusiveFor` metadata. Omitting the option preserves the API's default oracle selection; an empty list also allows the API defaults. Same-chain swaps ignore oracle selection.
