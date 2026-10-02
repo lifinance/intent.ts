@@ -1,7 +1,7 @@
 {
   "name": "@lifi/intent",
   "private": false,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Typescript library for OIF and LI.FI Intent",
   "repository": {
     "type": "git",
@@ -34,9 +34,22 @@
       "import": "./_esm/index.js",
       "require": "./_cjs/index.js",
       "default": "./_cjs/index.js"
+    },
+    "./axelar": {
+      "types": "./_types/axelar/index.d.ts",
+      "node": {
+        "import": "./_esm/axelar/index.js",
+        "require": "./_cjs/axelar/index.js"
+      },
+      "import": "./_esm/axelar/index.js",
+      "require": "./_cjs/axelar/index.js",
+      "default": "./_cjs/axelar/index.js"
     }
   },
   "sideEffects": false,
+  "workspaces": [
+    "relay/*"
+  ],
   "scripts": {
     "clean": "rm -rf _cjs _esm _types dist out",
     "prebuild": "bun run clean",
@@ -48,7 +61,7 @@
     "lint:staged": "prettier -w",
     "prepublishOnly": "bun run build && bun run check && bun run test",
     "test": "bun test",
-    "check": "tsc --noEmit -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p relay/axelar/tsconfig.json",
     "coverage": "bun run test --coverage",
     "coverage:lcov": "bun run coverage --coverage-reporter='lcov' --coverage-dir='./'"
   },
@@ -58,6 +71,7 @@
     ]
   },
   "dependencies": {
+    "@noble/curves": "^1.9.1",
     "@scure/base": "^2.2.0",
     "borsh": "^2.0.0",
     "ky": "^1.12.0",

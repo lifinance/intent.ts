@@ -17,12 +17,10 @@ const isExternal = (id) =>
   depNames.some((dep) => id === dep || id.startsWith(`${dep}/`));
 
 export default {
-  // Single entry point: `preserveModules` walks the import graph from here and
-  // emits one output file per reachable source module (path-preserved). Only
-  // the `.` export is published today, so this is sufficient. If subpath
-  // exports are added later (`@lifi/intent/...`), add their entry modules here
-  // and extend the `exports` map in package.json accordingly.
-  input: "src/index.ts",
+  // `preserveModules` walks the import graph from each entry and emits one
+  // output file per reachable source module (path-preserved). Each entry is a
+  // published `exports` path in package.json; keep the two lists in sync.
+  input: ["src/index.ts", "src/axelar/index.ts"],
   external: isExternal,
   output: [
     {

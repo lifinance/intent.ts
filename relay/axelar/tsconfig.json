@@ -1,11 +1,11 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    // Bundler mode
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "types": ["bun"]
   },
-  "exclude": ["node_modules", "relay"]
+  "include": ["src", "test", "../../src/axelar"]
 }

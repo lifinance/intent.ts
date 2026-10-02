@@ -59,6 +59,33 @@ Current Solana support is limited to standard single-input orders on mainnet
 and devnet. Testnet has no configured deployment. Solana inputs are not
 supported in multichain or compact orders.
 
+## Axelar (Solana)
+
+`@lifi/intent/axelar` builds unsigned instructions for the Solana
+`oracle_axelar` program (`FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw`) and the
+pinned Axelar 1.1.1 gateway and gas service. It never loads keys, contacts RPC
+or broadcasts. Instructions are `{ programId, keys, data }` with base58 keys and
+`0x` hex data.
+
+- Deployment: `axelarInitializeInstruction`, `axelarSetChainMappingInstruction`,
+  `axelarConfigAddress`, `axelarRouteAddress`, `decodeAxelarConfig`,
+  `decodeAxelarRoute`.
+- Source: `axelarSubmitInstruction` (`Relayed` with positive gas or `SelfRelay`
+  with zero; `consume` selects `submit_consume`), `axelarFundInstruction`.
+- Destination: `axelarApprovalSteps` turns prover `execute_data` into gateway
+  session, signature and approval transactions, refusing any approval other
+  than the expected single message; `axelarReceiveSteps` returns `execute` and
+  `register_proof`. The standard Axelar executor cannot fund `register_proof`,
+  so settlement after paid relaying still needs a caller to submit it.
+- Before funding an order: `checkSolanaAxelarAdmission` (one proof of at most
+  320 bytes per message, nonzero u128 chain IDs).
+
+Outputs are byte-identical to the reference builder in lifi-intent-svm
+(`axelar_litesvm/src/client_vectors.rs`); `tests/vectors/axelarClientVectors.json`
+is copied from there and must be refreshed whenever the program ABI changes.
+The caller-operated relay that drives these steps end to end lives in
+[`relay/axelar`](relay/axelar/README.md) (private workspace package).
+
 ## Architecture
 
 - `types.ts`
@@ -202,6 +229,7 @@ These utilities are the core gate for normalizing and validating inbound order d
 - `src/validation.ts`
 - `src/api/intentApi.ts`
 - `src/typedMessage.ts`
+- `src/axelar/index.ts`
 
 ### Explicit EVM oracle quotes
 
