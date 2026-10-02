@@ -8,6 +8,9 @@ import type { HubConfig, Job } from "./source";
 import type { Journal, StoredTransaction } from "./state";
 
 export class Pending extends Error {}
+// The destination definitively refused a transaction: a failed simulation or an
+// on-chain failure. Lost or unconfirmed responses never raise this.
+export class Rejected extends Error {}
 
 export type HubReceipt = {
   code?: number;

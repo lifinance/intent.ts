@@ -122,9 +122,12 @@ one new verification request. A verified source-transaction failure is terminal.
 
 Each `construct_proof` starts a signing session under the prover's current
 verifier set. A session that remains unsigned past its `expires_at` height is
-renewed with one replacement request. If the destination rejects a completed
-proof and the prover has since rotated its verifier set, the relay discards that
-proof (exit code 2); the next `relay` pass signs a replacement session with the
+renewed with one replacement request. If the destination definitively rejects a
+completed proof (a failed simulation or an on-chain failure of the approval) and
+the prover has since rotated its verifier set, the relay discards that proof
+(exit code 2); the next `relay` pass signs a replacement session with the
+current set. A lost response or RPC error never discards a proof, because the
+journaled approval may still be in flight.
 current set. Destination approvals are journaled per signing session, so a
 replacement never replays the rejected session's signed approval.
 

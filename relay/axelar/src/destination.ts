@@ -12,6 +12,7 @@ import {
 import {
   Contract as EvmContract,
   Interface,
+  isError,
   keccak256,
   toUtf8Bytes,
   type TransactionRequest,
@@ -21,7 +22,12 @@ import {
   axelarApprovalSteps,
   type AxelarMessage,
 } from "../../../src/axelar/index";
-import { Pending } from "./hub";
+import {
+  discardRotatedProof,
+  type HubQueryClient,
+  Pending,
+  Rejected,
+} from "./hub";
 import {
   completed,
   receiveContext,
@@ -85,20 +91,26 @@ export async function evmSend(
   return journal.transaction(
     `evm:${name}`,
     async () => {
-      const tx = await signer.populateTransaction(request);
+      // Gas estimation simulates the call; a revert here signs nothing.
+      const tx = await signer.populateTransaction(request).catch((e) => {
+        if (isError(e, "CALL_EXCEPTION"))
+          throw new Rejected(`EVM simulation reverted: ${e.shortMessage}`);
+        throw e;
+      });
       const raw = await signer.signTransaction(tx);
       return { id: keccak256(raw), raw };
     },
     async (tx: StoredTransaction) => {
       const receipt = await provider.getTransactionReceipt(tx.id);
       if (receipt && receipt.status !== 1)
-        throw new Error(`EVM transaction ${tx.id} reverted`);
+        throw new Rejected(`EVM transaction ${tx.id} reverted`);
       return receipt;
     },
     async (tx) => {
       const result = await provider.broadcastTransaction(tx.raw);
       const receipt = await result.wait();
-      if (receipt?.status !== 1) throw new Error("EVM transaction reverted");
+      if (receipt?.status !== 1)
+        throw new Rejected(`EVM transaction ${tx.id} reverted`);
       return receipt;
     },
   );
@@ -117,7 +129,7 @@ export async function stellarCall(
   const lookup = async (tx: StoredTransaction) => {
     const result = await server.getTransaction(tx.id);
     if (result.status === rpc.Api.GetTransactionStatus.FAILED)
-      throw new Error(`Stellar transaction ${tx.id} failed`);
+      throw new Rejected(`Stellar transaction ${tx.id} failed`);
     return result.status === rpc.Api.GetTransactionStatus.SUCCESS
       ? result
       : null;
@@ -138,7 +150,7 @@ export async function stellarCall(
           "Restore archived Stellar state, then resume this journal",
         );
       if (!rpc.Api.isSimulationSuccess(simulation))
-        throw new Error(
+        throw new Rejected(
           `Stellar simulation failed: ${"error" in simulation ? simulation.error : "unexpected response"}`,
         );
       // Proof approval/execution is permissionless. Refuse unexpected spending authorizations.
@@ -383,5 +395,43 @@ export async function finishDestination({
     } catch (e) {
       if (!(await destinationStatus({ job, stellar })).complete) throw e;
     }
+  }
+}
+
+// Submit the proof; after a definitive refusal, discard it only if the prover has
+// rotated away from its verifier set. A lost broadcast response or RPC failure can
+// hide an in-flight approval, so it keeps the journaled signed bytes untouched.
+export async function finishOrRenewProof({
+  job,
+  journal,
+  executeData,
+  connectHub,
+  ...deps
+}: DestinationDeps & {
+  job: Job;
+  journal: Journal;
+  executeData?: string;
+  connectHub: () => Promise<HubQueryClient & { disconnect(): void }>;
+}): Promise<void> {
+  try {
+    await finishDestination({ job, journal, executeData, ...deps });
+  } catch (error) {
+    if (
+      !(error instanceof Rejected) ||
+      !executeData ||
+      (await destinationStatus({ job, ...deps })).approved
+    )
+      throw error;
+    const client = await connectHub();
+    let discarded;
+    try {
+      discarded = await discardRotatedProof({ client, job, journal });
+    } finally {
+      client.disconnect();
+    }
+    if (!discarded) throw error;
+    throw new Pending(
+      `Destination rejected a proof signed by a rotated-out Axelar verifier set (${error.message}); run relay to sign a replacement`,
+    );
   }
 }

@@ -20,6 +20,7 @@ import {
   type AxelarReceivePlan,
   type AxelarStep,
 } from "../../../src/axelar/index";
+import { Rejected } from "./hub";
 import type { Job } from "./source";
 import type { Journal, StoredTransaction } from "./state";
 
@@ -186,7 +187,7 @@ export async function sendStep({
       })
     ).value[0];
     if (result?.err)
-      throw new Error(
+      throw new Rejected(
         `Solana transaction ${tx.id} failed: ${JSON.stringify(result.err)}`,
       );
     return result?.confirmationStatus === "finalized" ? result : null;
@@ -222,7 +223,7 @@ export async function sendStep({
           "finalized",
         );
         if (result.value.err)
-          throw new Error(
+          throw new Rejected(
             `Solana execution failed: ${JSON.stringify(result.value.err)}`,
           );
         return result;

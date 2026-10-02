@@ -10,10 +10,10 @@ import { Keypair as StellarKeypair, rpc } from "@stellar/stellar-sdk";
 import { JsonRpcProvider, Wallet } from "ethers";
 import {
   destinationStatus,
-  finishDestination,
+  finishOrRenewProof,
   type DestinationDeps,
 } from "./destination";
-import { discardRotatedProof, Pending, relayHub } from "./hub";
+import { Pending, relayHub } from "./hub";
 import { admission } from "./solana";
 import { extract, validateJob } from "./source";
 import { exclusive, Journal } from "./state";
@@ -122,27 +122,13 @@ async function main() {
         client.disconnect();
       }
     }
-    try {
-      await finishDestination({ job, journal, executeData, ...deps });
-    } catch (error) {
-      if (
-        error instanceof Pending ||
-        !executeData ||
-        (await destinationStatus({ job, ...deps })).approved
-      )
-        throw error;
-      const hub = await CosmWasmClient.connect(job.hub.rpcUrl);
-      let discarded;
-      try {
-        discarded = await discardRotatedProof({ client: hub, job, journal });
-      } finally {
-        hub.disconnect();
-      }
-      if (!discarded) throw error;
-      throw new Pending(
-        `Destination rejected a proof signed by a rotated-out Axelar verifier set (${(error as Error).message}); run relay to sign a replacement`,
-      );
-    }
+    await finishOrRenewProof({
+      job,
+      journal,
+      executeData,
+      connectHub: () => CosmWasmClient.connect(job.hub.rpcUrl),
+      ...deps,
+    });
     console.log(
       "Destination proof registered. The order claimant can now submit finalisation, or anyone can submit an eligible refund.",
     );
