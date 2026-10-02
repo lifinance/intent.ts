@@ -30,19 +30,32 @@ configuration shape:
 ```json
 {
   "source": {
-    "platform": "stellar", "chainName": "stellar", "chainId": "REPLACE",
-    "rpcUrl": "REPLACE", "networkPassphrase": "REPLACE",
-    "oracle": "REPLACE", "gateway": "REPLACE", "gasService": "REPLACE"
+    "platform": "stellar",
+    "chainName": "stellar",
+    "chainId": "REPLACE",
+    "rpcUrl": "REPLACE",
+    "networkPassphrase": "REPLACE",
+    "oracle": "REPLACE",
+    "gateway": "REPLACE",
+    "gasService": "REPLACE"
   },
   "destination": {
-    "platform": "solana", "chainName": "solana", "chainId": "REPLACE",
-    "rpcUrl": "REPLACE", "genesisHash": "REPLACE",
-    "oracle": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw", "gateway": "REPLACE"
+    "platform": "solana",
+    "chainName": "solana",
+    "chainId": "REPLACE",
+    "rpcUrl": "REPLACE",
+    "genesisHash": "REPLACE",
+    "oracle": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+    "gateway": "REPLACE"
   },
   "hub": {
-    "rpcUrl": "REPLACE", "chainId": "REPLACE", "gasPrice": "REPLACEuaxl",
-    "sourceGateway": "REPLACE", "votingVerifier": "REPLACE",
-    "destinationGateway": "REPLACE", "destinationProver": "REPLACE",
+    "rpcUrl": "REPLACE",
+    "chainId": "REPLACE",
+    "gasPrice": "REPLACEuaxl",
+    "sourceGateway": "REPLACE",
+    "votingVerifier": "REPLACE",
+    "destinationGateway": "REPLACE",
+    "destinationProver": "REPLACE",
     "fullMessagePayloads": false
   }
 }
@@ -128,7 +141,7 @@ the prover has since rotated its verifier set, the relay discards that proof
 (exit code 2); the next `relay` pass signs a replacement session with the
 current set. A lost response or RPC error never discards a proof, because the
 journaled approval may still be in flight.
-current set. Destination approvals are journaled per signing session, so a
+Destination approvals are journaled per signing session, so a
 replacement never replays the rejected session's signed approval.
 
 Each pass reconciles gateway state. The adjacent journal atomically saves signed
