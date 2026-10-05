@@ -77,6 +77,7 @@ test("library builds bounded standard execution and registration transactions", 
   const manifest = {
     platform: "solana",
     oracle: AXELAR_ORACLE_PROGRAM,
+    owner: payer,
     gateway,
     gasService,
     chainId: "9",

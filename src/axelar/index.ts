@@ -55,6 +55,7 @@ const SYSTEM_PROGRAM = "11111111111111111111111111111111";
 const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
 const FILL_MAGIC = Uint8Array.of(0xd1, 0x25, 0x2d, 0xff);
 const NOT_FILLED_MAGIC = Uint8Array.of(0x83, 0x0c, 0x1e, 0x1c);
+const ZERO_CONFIG: Hex = `0x${"00".repeat(32)}`;
 
 export type AxelarDeliveryMode = "Relayed" | "SelfRelay";
 export type AxelarAccountMeta = {
@@ -103,6 +104,11 @@ const payer = (key: string): AxelarAccountMeta => ({
   pubkey: key,
   isSigner: true,
   isWritable: true,
+});
+const signer = (key: string): AxelarAccountMeta => ({
+  pubkey: key,
+  isSigner: true,
+  isWritable: false,
 });
 function instruction(
   programId: string,
@@ -168,9 +174,13 @@ export function decodeAxelarRoute(data: Bytes) {
   return { name, chainId, kind };
 }
 
-/** `initialize`: one-time configuration by the program upgrade authority, who becomes the mapping owner. */
+/**
+ * `initialize`: one-time configuration by the program upgrade authority (`payer`);
+ * `owner` becomes the mapping owner.
+ */
 export function axelarInitializeInstruction(a: {
   payer: string;
+  owner: string;
   gateway: string;
   gasService: string;
   chainName: string;
@@ -190,7 +200,32 @@ export function axelarInitializeInstruction(a: {
       ro(INTENTS_PROTOCOL_PROGRAM),
       ro(SYSTEM_PROGRAM),
     ],
-    new BorshWriter().string(a.chainName),
+    new BorshWriter().raw(pubkey(a.owner)).string(a.chainName),
+  );
+}
+
+/** Owner-only `transfer_ownership` to a nonzero `newOwner`. */
+export function axelarTransferOwnershipInstruction(a: {
+  owner: string;
+  newOwner: string;
+}): AxelarInstruction {
+  return instruction(
+    AXELAR_ORACLE_PROGRAM,
+    "transfer_ownership",
+    [signer(a.owner), rw(axelarConfigAddress())],
+    new BorshWriter().raw(pubkey(a.newOwner)),
+  );
+}
+
+/** Owner-only `renounce_ownership`; no chain mappings can be added afterwards. */
+export function axelarRenounceOwnershipInstruction(a: {
+  owner: string;
+}): AxelarInstruction {
+  return instruction(
+    AXELAR_ORACLE_PROGRAM,
+    "renounce_ownership",
+    [signer(a.owner), rw(axelarConfigAddress())],
+    new BorshWriter(),
   );
 }
 
@@ -199,11 +234,11 @@ export function axelarSetChainMappingInstruction(a: {
   owner: string;
   name: string;
   chainId: bigint;
-  kind: AxelarRouteKind;
+  kind: AxelarAddressKind;
 }): AxelarInstruction {
-  // Borsh `AddressKind` index; untyped callers may still pass "solana" (-1 here).
-  const kind = KINDS.slice(0, 2).indexOf(a.kind);
-  if (kind < 0) throw new Error("Remote route must be evm or stellar");
+  // Borsh `AddressKind` index.
+  const kind = KINDS.indexOf(a.kind);
+  if (kind < 0) throw new Error("Unknown route kind");
   if (!/^[a-z0-9-]+$/.test(a.name) || a.name.length > AXELAR_MAX_CHAIN_NAME)
     throw new Error("Axelar chain name must be 1-20 bytes of a-z, 0-9 or '-'");
   if (a.chainId <= 0n) throw new Error("Chain ID must be a nonzero u128");
@@ -260,7 +295,9 @@ function payloadCommitment(payload: Uint8Array): Uint8Array {
 /**
  * `submit` (non-consuming, default) or `submit_consume` (closes the source local
  * attestation; `payer` must be its recorded rent recipient). `Relayed` requires a
- * positive gas payment; `SelfRelay` requires exactly zero.
+ * positive gas payment; `SelfRelay` requires exactly zero and passes no gas-service
+ * accounts. `destinationConfig` is the remote configuration account of a Solana-kind
+ * route (wrapped in the executable envelope) and must be zero (the default) otherwise.
  */
 export function axelarSubmitInstruction(a: {
   payer: string;
@@ -271,6 +308,7 @@ export function axelarSubmitInstruction(a: {
   recipientOracle: Hex;
   payload: Bytes;
   gasAmount: bigint;
+  destinationConfig?: Hex;
   deliveryMode: AxelarDeliveryMode;
   consume?: boolean;
 }): AxelarInstruction {
@@ -298,9 +336,14 @@ export function axelarSubmitInstruction(a: {
     ro(a.gateway),
     ro(pda(a.gateway, "gateway")),
     ro(pda(a.gateway, "__event_authority")),
-    ro(a.gasService),
-    rw(pda(a.gasService, "gas-service")),
-    ro(pda(a.gasService, "__event_authority")),
+    // Anchor's `None` placeholder for the optional gas-service accounts is the program ID.
+    ...(a.deliveryMode === "Relayed"
+      ? [
+          ro(a.gasService),
+          rw(pda(a.gasService, "gas-service")),
+          ro(pda(a.gasService, "__event_authority")),
+        ]
+      : [ro(program), ro(program), ro(program)]),
     ro(SYSTEM_PROGRAM),
     ...(a.consume
       ? [
@@ -321,6 +364,7 @@ export function axelarSubmitInstruction(a: {
       .raw(pubkey(a.source))
       .bytes(payload)
       .u64(a.gasAmount)
+      .raw(bytes32(a.destinationConfig ?? ZERO_CONFIG, "destinationConfig"))
       .u8(a.deliveryMode === "Relayed" ? 0 : 1),
   );
 }

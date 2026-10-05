@@ -6,9 +6,11 @@ import {
   axelarApprovalSteps,
   axelarFundInstruction,
   axelarInitializeInstruction,
+  axelarRenounceOwnershipInstruction,
   axelarReceiveSteps,
   axelarRouteAddress,
   axelarSetChainMappingInstruction,
+  axelarTransferOwnershipInstruction,
   axelarSubmitInstruction,
   decodeAxelarConfig,
   decodeAxelarRoute,
@@ -39,10 +41,18 @@ function run(r: Request): unknown {
     case "initialize":
       return axelarInitializeInstruction({
         payer: r.payer,
+        owner: r.owner,
         gateway: r.gateway,
         gasService: r.gasService,
         chainName: r.chainName,
       });
+    case "transferOwnership":
+      return axelarTransferOwnershipInstruction({
+        owner: r.owner,
+        newOwner: r.newOwner,
+      });
+    case "renounceOwnership":
+      return axelarRenounceOwnershipInstruction({ owner: r.owner });
     case "fund":
       return axelarFundInstruction({
         payer: r.payer,
@@ -60,6 +70,7 @@ function run(r: Request): unknown {
         recipientOracle: hex(r.recipientOracle),
         payload: hex(r.payload),
         gasAmount: BigInt(r.gasAmount),
+        destinationConfig: r.destinationConfig && hex(r.destinationConfig),
         deliveryMode: r.deliveryMode,
         consume: r.consume,
       });

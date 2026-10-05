@@ -88,8 +88,13 @@ contracts cannot infer the selected transport's lower operational limits.
 Solana `deployment(manifest, payer)` in `src/deployment.ts` validates the
 manifest and returns the `axelarInitializeInstruction` result, one
 `axelarSetChainMappingInstruction` per manifest route, and the command to revoke
-the program upgrade authority. The initializing `payer` becomes the permanent
-mapping owner; `chainMapping(route, owner)` builds later additions. Chain names
+the program upgrade authority. The initializing `payer` must be the upgrade
+authority; the manifest's `owner` becomes the mapping owner, who signs every
+mapping (`chainMapping(route, owner)` builds later additions) and can transfer
+(`axelarTransferOwnershipInstruction`) or renounce
+(`axelarRenounceOwnershipInstruction`) ownership. Route kinds are `evm`,
+`stellar` or `solana`; Solana-kind routes need a nonzero `destinationConfig` on
+`axelarSubmitInstruction`. Chain names
 are lowercase Axelar names of at most 20 bytes; mappings are set once and cannot
 change. Verify the program ID, protocol chain ID and gateway deployment before
 initializing; revoke upgrade authority after initialization. Exported source

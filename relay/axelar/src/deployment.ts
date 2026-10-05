@@ -16,6 +16,8 @@ export type ChainRoute = {
 export type DeploymentManifest = {
   platform: string;
   oracle: string;
+  /** Mapping owner recorded at initialization; must not be the default (system) key. */
+  owner: string;
   gateway: string;
   gasService: string;
   chainId: string | number;
@@ -56,7 +58,9 @@ export function chainMapping(
   if (
     typeof route.name !== "string" ||
     !CHAIN_NAME.test(route.name) ||
-    (route.kind !== "evm" && route.kind !== "stellar")
+    (route.kind !== "evm" &&
+      route.kind !== "stellar" &&
+      route.kind !== "solana")
   )
     throw new Error("Invalid Axelar chain mapping");
   return axelarSetChainMappingInstruction({
@@ -77,6 +81,12 @@ export function deployment(
   new PublicKey(m.gateway);
   new PublicKey(m.gasService);
   new PublicKey(payer);
+  if (
+    typeof m.owner !== "string" ||
+    m.owner === "11111111111111111111111111111111"
+  )
+    throw new Error("Invalid owner");
+  new PublicKey(m.owner);
   if (typeof m.chainName !== "string" || !CHAIN_NAME.test(m.chainName))
     throw new Error("Invalid local chain name");
   const local = uint128(m.chainId);
@@ -98,14 +108,15 @@ export function deployment(
     program: AXELAR_ORACLE_PROGRAM,
     inputOracle: axelarConfigAddress(),
     outputOracle: AXELAR_ORACLE_PROGRAM,
-    owner: payer,
+    owner: m.owner,
     initialize: axelarInitializeInstruction({
       payer,
+      owner: m.owner,
       gateway: m.gateway,
       gasService: m.gasService,
       chainName: m.chainName,
     }),
-    mappings: m.routes.map((r) => chainMapping(r, payer)),
+    mappings: m.routes.map((r) => chainMapping(r, m.owner)),
     finalization: [
       "solana",
       "program",

@@ -32,6 +32,8 @@ const entries = {
   "axelar/index": [
     "AXELAR_ORACLE_PROGRAM",
     "axelarSubmitInstruction",
+    "axelarTransferOwnershipInstruction",
+    "axelarRenounceOwnershipInstruction",
     "axelarApprovalSteps",
     "axelarReceiveSteps",
     "checkSolanaAxelarAdmission",
