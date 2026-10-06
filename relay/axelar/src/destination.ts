@@ -37,7 +37,12 @@ import {
 import type { Job } from "./source";
 import type { Journal, StoredTransaction } from "./state";
 
-export type SolanaDestination = { connection: Connection; signer: Keypair };
+/** `computeUnitPrice`: priority fee in microLamports per compute unit; omitted sends none. */
+export type SolanaDestination = {
+  connection: Connection;
+  signer: Keypair;
+  computeUnitPrice?: number;
+};
 export type EvmDestination = { signer: Wallet };
 export type StellarDestination = { server: rpc.Server; signer: StellarKeypair };
 export type DestinationDeps = {
@@ -60,6 +65,8 @@ const evmAbi = [
 const approvalAbi = new Interface([
   "function approveMessages((string sourceChain,string messageId,string sourceAddress,address contractAddress,bytes32 payloadHash)[] messages,(((address signer,uint128 weight)[] signers,uint128 threshold,bytes32 nonce) signers,bytes[] signatures) proof)",
 ]);
+// Bound one pass's wait for inclusion; a later pass reconciles the journaled hash by receipt.
+const EVM_CONFIRMATION_TIMEOUT_MS = 5 * 60_000;
 
 export function validateEvmApproval(
   data: string,
@@ -108,10 +115,14 @@ export async function evmSend(
     },
     async (tx) => {
       const result = await provider.broadcastTransaction(tx.raw);
-      const receipt = await result.wait();
-      if (receipt?.status !== 1)
-        throw new Rejected(`EVM transaction ${tx.id} reverted`);
-      return receipt;
+      // ethers 6 `wait` throws CALL_EXCEPTION for a status-0 receipt.
+      return (await result.wait(1, EVM_CONFIRMATION_TIMEOUT_MS).catch((e) => {
+        if (isError(e, "CALL_EXCEPTION"))
+          throw new Rejected(`EVM transaction ${tx.id} reverted`);
+        if (isError(e, "TIMEOUT"))
+          throw new Pending(`Waiting for EVM transaction ${tx.id}`);
+        throw e;
+      }))!;
     },
   );
 }

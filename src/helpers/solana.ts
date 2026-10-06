@@ -76,9 +76,11 @@ export function isSolanaBase58Address(value: string): boolean {
 const PDA_MARKER = new TextEncoder().encode("ProgramDerivedAddress");
 
 /**
- * Solana `Pubkey::find_program_address`: the first bump from 255 downward
- * whose `sha256(seeds || bump || programId || "ProgramDerivedAddress")` is
- * off the ed25519 curve. Returns the base58 address and its bump.
+ * Solana `Pubkey::find_program_address`: the first bump from 255 down to 1
+ * (the runtime never tries 0) whose
+ * `sha256(seeds || bump || programId || "ProgramDerivedAddress")` is off the
+ * ed25519 curve. On-curve is decided with ZIP-215 decoding, matching dalek's
+ * `CompressedEdwardsY::decompress`. Returns the base58 address and its bump.
  */
 export function findSolanaProgramAddress(
   seeds: readonly Uint8Array[],
@@ -87,7 +89,7 @@ export function findSolanaProgramAddress(
   const program = hexToBytes(solanaBase58ToBytes32(programId));
   if (seeds.length > 15 || seeds.some((s) => s.length > 32))
     throw new Error("Solana PDA seeds exceed 15 seeds of 32 bytes");
-  for (let bump = 255; bump >= 0; bump--) {
+  for (let bump = 255; bump >= 1; bump--) {
     const preimage = new Uint8Array(
       seeds.reduce((n, s) => n + s.length, 0) + 1 + 32 + PDA_MARKER.length,
     );
@@ -98,7 +100,7 @@ export function findSolanaProgramAddress(
     }
     const candidate = sha256(preimage, "bytes");
     try {
-      ed25519.ExtendedPoint.fromHex(candidate);
+      ed25519.ExtendedPoint.fromHex(candidate, true);
     } catch {
       return [base58.encode(candidate), bump];
     }

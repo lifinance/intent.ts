@@ -1,14 +1,17 @@
 // Post-build smoke test: confirms each built dual-format entry point exposes
-// the same named runtime exports from ESM and CJS. Catches a broken `exports`
-// map, a missing subdir marker, or a CJS default-unwrap regression. Run by
-// `bun run build:smoke` (chained after the build).
+// the same named runtime exports from ESM and CJS. Entries are loaded by
+// package specifier (self-reference), so resolution goes through the
+// `exports` map; catches a broken `exports` map, a missing subdir marker, or a
+// CJS default-unwrap regression. Run by `bun run build:smoke` (chained after
+// the build).
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 
 // A representative slice of each entry's public value exports that must always resolve.
+// Keyed by package specifier; resolved via package.json `exports`.
 const entries = {
-  index: [
+  "@lifi/intent": [
     "Intent",
     "IntentApi",
     "VALIDATION_ERRORS",
@@ -29,7 +32,7 @@ const entries = {
     "NOT_FILLED_MAGIC",
     "findSolanaProgramAddress",
   ],
-  "axelar/index": [
+  "@lifi/intent/axelar": [
     "AXELAR_ORACLE_PROGRAM",
     "axelarSubmitInstruction",
     "axelarTransferOwnershipInstruction",
@@ -41,8 +44,8 @@ const entries = {
 };
 
 for (const [entry, expected] of Object.entries(entries)) {
-  const esmKeys = Object.keys(await import(`../_esm/${entry}.js`)).sort();
-  const cjsKeys = Object.keys(require(`../_cjs/${entry}.js`)).sort();
+  const esmKeys = Object.keys(await import(entry)).sort();
+  const cjsKeys = Object.keys(require(entry)).sort();
   const missing = expected.filter(
     (k) => !esmKeys.includes(k) || !cjsKeys.includes(k),
   );

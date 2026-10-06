@@ -56,6 +56,7 @@ async function harness() {
     broadcasts: [] as string[],
     accepted: [] as string[],
     queries: [] as string[],
+    log: [] as string[],
     receipts: new Map<string, HubReceipt>(),
     lostResponse: null as "before inclusion" | "after inclusion" | null,
     afterEndStatus: null as string | null,
@@ -85,7 +86,12 @@ async function harness() {
     getHeight: async () => f.height,
     queryContractSmart: async (_address, query) => {
       f.queries.push(Object.keys(query)[0]!);
-      if (query.outgoing_messages) return f.routed ? [message] : [];
+      if (query.outgoing_messages) {
+        if (f.routed) return [message];
+        throw new Error(
+          `Query failed with (6): rpc error: code = Unknown desc = failed to query outgoing messages: message with ID ${message.cc_id.message_id} not found`,
+        );
+      }
       if (query.messages_status) return structuredClone(responses[f.status]);
       if (query.poll_by_message) return structuredClone(f.poll);
       if (query === "current_verifier_set")
@@ -103,6 +109,7 @@ async function harness() {
     sign: async (_sender, messages) => {
       const msg = JSON.parse(Buffer.from(messages[0]!.value.msg).toString());
       f.prepared.push(msg);
+      f.log.push("sign");
       return {
         bodyBytes: Buffer.from(
           JSON.stringify({ msg, sequence: f.prepared.length }),
@@ -111,7 +118,10 @@ async function harness() {
         signatures: [],
       };
     },
-    getTx: async (id) => f.receipts.get(id) ?? null,
+    getTx: async (id) => {
+      f.log.push(`getTx:${id}`);
+      return f.receipts.get(id) ?? null;
+    },
     broadcastTx: async (raw) => {
       f.broadcasts.push(Buffer.from(raw).toString("base64"));
       const loss = f.lostResponse;
@@ -277,7 +287,14 @@ test("a lost included response is reconciled before retrying a newer failed poll
   await expect(f.run()).rejects.toThrow(/Lost broadcast response/);
   expect((await f.journal()).state.pendingVerification).toBe("verify:after:7");
   f.setPoll("failed_to_verify", 8); // Poll 8 finishes before the caller restarts.
+  const [included] = f.receipts.keys();
+  f.log.length = 0;
   await expect(f.run()).rejects.toBeInstanceOf(Pending);
+  // The included verify:after:7 is looked up before verify:after:8 is signed.
+  expect(f.log.indexOf(`getTx:${included}`)).toBeGreaterThanOrEqual(0);
+  expect(f.log.indexOf(`getTx:${included}`)).toBeLessThan(
+    f.log.indexOf("sign"),
+  );
   expect(f.prepared.length).toBe(2);
   expect(f.broadcasts.length).toBe(2);
   expect(await transactions(f)).toEqual([

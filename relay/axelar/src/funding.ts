@@ -22,6 +22,10 @@ export function funding(
   amount: bigint | string | number,
 ): AxelarInstruction | EvmFunding | xdr.Operation {
   validateJob(job);
+  if (typeof amount === "number" && !Number.isSafeInteger(amount))
+    throw new Error(
+      "Funding amount must be a safe integer; pass larger amounts as bigint or decimal string",
+    );
   const value = BigInt(amount);
   const s = job.source,
     gasService = s.gasService,

@@ -15,6 +15,12 @@ import {
   isSolanaBase58Address,
   solanaBase58ToBytes32,
 } from "../helpers/solana";
+import {
+  bytes32ToStellarAccount,
+  bytes32ToStellarContract,
+  isStellarAccount,
+  isStellarContract,
+} from "../helpers/stellar";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
 
@@ -154,13 +160,14 @@ type GetQuoteResponse = {
  * caller. The quote API names solvers the way the chain does — a 20-byte
  * address on EVM and Tron — and a padded value there would reach the order
  * service as an address it cannot parse. Solana keys are 32 bytes in both
- * places and pass straight through.
+ * places and pass straight through, as do Stellar solver identities: those are
+ * 32-byte address commitments, which no 20-byte truncation can preserve.
  */
 function toSolverAddress(
   solver: `0x${string}`,
   namespace: Namespace = "eip155",
 ): `0x${string}` {
-  if (namespace === "solana") return solver;
+  if (namespace === "solana" || namespace === "stellar") return solver;
   return /^0x[0-9a-fA-F]{64}$/.test(solver)
     ? (bytes32ToAddress(solver) as `0x${string}`)
     : solver;
@@ -172,6 +179,12 @@ function toCaip2Chain(
 ): string {
   return `${namespace}:${chainId}`;
 }
+
+/**
+ * What a quote field names. Only Stellar needs it: its strkey encodes the
+ * address kind, which the bare 32-byte form does not carry.
+ */
+type QuoteAddressRole = "user" | "asset" | "receiver" | "solver";
 
 /**
  * An address or asset in the notation its own namespace uses on the wire.
@@ -188,33 +201,66 @@ function toCaip2Chain(
  * Already-base58 input passes through, so a caller holding a native Solana
  * address needs no conversion of its own.
  *
+ * Stellar is a strkey on the wire, and the strkey encodes whether the key is an
+ * account (`G…`) or a contract (`C…`). A user is the order's signing account
+ * and an asset is a token contract, so their 32-byte form converts
+ * unambiguously. A receiver may be either — orders tag the recipient kind in
+ * the output context — so its 32-byte form is rejected and the strkey must be
+ * passed. A solver is a 32-byte address commitment (a hash, not a key), which
+ * has no strkey and passes through as hex.
+ *
  * EVM and Tron are deliberately untouched: the API accepts their hex form
  * today, and Tron's base58 is a different (checksummed) encoding that should
  * only be introduced against a verified API expectation.
  */
 function toQuoteAddress(
   value: string,
+  role: QuoteAddressRole,
   namespace: Namespace = "eip155",
 ): string {
+  if (namespace === "stellar") return toStellarQuoteAddress(value, role);
+  const isBytes32 = /^0x[0-9a-fA-F]{64}$/.test(value);
   if (namespace !== "solana") {
     // A 32-byte value under any other namespace is a missing or wrong
     // `namespace`, not a legitimate address: EVM and Tron are both 20 bytes.
     // Left unchecked it reaches the API as an `eip155` field and comes back as
     // `bytes32 value has non-zero upper bytes`, which names the asset rather
     // than the namespace that actually caused it.
-    if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    if (isBytes32) {
       throw new Error(
-        `Quote request invalid: "${value}" is 32 bytes but its namespace is "${namespace}" — set namespace to the chain's own (e.g. "solana")`,
+        `Quote request invalid: "${value}" is 32 bytes but its namespace is "${namespace}" — set namespace to the chain's own ("solana" or "stellar")`,
       );
     }
     return value;
   }
-  if (/^0x[0-9a-fA-F]{64}$/.test(value)) {
+  if (isBytes32) {
     return bytes32ToSolanaBase58(value as `0x${string}`);
   }
   if (isSolanaBase58Address(value)) return value;
   throw new Error(
     `Quote request invalid: "${value}" is not a Solana address (expected base58 or 32-byte hex)`,
+  );
+}
+
+function toStellarQuoteAddress(value: string, role: QuoteAddressRole): string {
+  const isBytes32 = /^0x[0-9a-fA-F]{64}$/.test(value);
+  if (role === "solver") {
+    if (isBytes32) return value;
+    throw new Error(
+      `Quote request invalid: "${value}" is not a Stellar solver commitment (expected 32-byte hex)`,
+    );
+  }
+  if (isStellarAccount(value) || isStellarContract(value)) return value;
+  if (isBytes32) {
+    const bytes32 = value as `0x${string}`;
+    if (role === "user") return bytes32ToStellarAccount(bytes32);
+    if (role === "asset") return bytes32ToStellarContract(bytes32);
+    throw new Error(
+      `Quote request invalid: Stellar receiver "${value}" may be an account or a contract — pass the strkey (G… or C…)`,
+    );
+  }
+  throw new Error(
+    `Quote request invalid: "${value}" is not a Stellar address (expected a G…/C… strkey or 32-byte hex)`,
   );
 }
 
@@ -551,8 +597,8 @@ export class IntentApi {
         const chain = toCaip2Chain(input.chainId, input.namespace);
         return {
           chain,
-          user: toQuoteAddress(input.sender, input.namespace),
-          asset: toQuoteAddress(input.asset, input.namespace),
+          user: toQuoteAddress(input.sender, "user", input.namespace),
+          asset: toQuoteAddress(input.asset, "asset", input.namespace),
           amount: input.amount.toString(),
         };
       }),
@@ -560,8 +606,12 @@ export class IntentApi {
         const chain = toCaip2Chain(output.chainId, output.namespace);
         const o: Record<string, unknown> = {
           chain,
-          receiver: toQuoteAddress(output.receiver, output.namespace),
-          asset: toQuoteAddress(output.asset, output.namespace),
+          receiver: toQuoteAddress(
+            output.receiver,
+            "receiver",
+            output.namespace,
+          ),
+          asset: toQuoteAddress(output.asset, "asset", output.namespace),
         };
         if (output.amount !== undefined) o.amount = output.amount.toString();
         return o;
@@ -576,7 +626,11 @@ export class IntentApi {
     const inputNamespace = inputs[0]?.namespace;
     if (exclusiveFor && exclusiveFor.length > 0) {
       metadata.exclusiveFor = exclusiveFor.map((solver) =>
-        toQuoteAddress(toSolverAddress(solver, inputNamespace), inputNamespace),
+        toQuoteAddress(
+          toSolverAddress(solver, inputNamespace),
+          "solver",
+          inputNamespace,
+        ),
       );
     }
     if (oracle !== undefined) {
@@ -608,7 +662,7 @@ export class IntentApi {
     const rq = {
       user: {
         chain: toCaip2Chain(userChainId, userNamespace),
-        address: toQuoteAddress(user, userNamespace),
+        address: toQuoteAddress(user, "user", userNamespace),
       },
       intent,
       supportedTypes: ["oif-user-open-v0"],

@@ -22,7 +22,6 @@ import {
   AXELAR_MAX_CHAIN_NAME,
   type AxelarAddressKind,
   type AxelarMessage,
-  type AxelarRouteKind,
   axelarMessageHash,
   axelarCommandId,
   checkMessageBounds,
@@ -37,7 +36,6 @@ export {
   AXELAR_MAX_CHAIN_NAME,
   type AxelarAddressKind,
   type AxelarMessage,
-  type AxelarRouteKind,
   axelarCommandId,
   axelarMessageHash,
   decodeAxelarAddress,
@@ -279,7 +277,12 @@ export function axelarFundInstruction(a: {
   );
 }
 
-/** `oracle_base::decode_payload_commitment`: the local-attestation key of a fill or not-filled proof. */
+/**
+ * `oracle_base::decode_payload_commitment`: the local-attestation key of a fill or
+ * not-filled proof. Like the pinned `decode_fill_description` /
+ * `decode_not_filled_description`, only the magic and minimum length are checked;
+ * the common payload's u16 length prefixes are not parsed on-chain.
+ */
 function payloadCommitment(payload: Uint8Array): Uint8Array {
   const magic = payload.subarray(0, 4);
   if (equal(magic, FILL_MAGIC) && payload.length >= 172)
@@ -541,7 +544,7 @@ export function axelarReceiveSteps(a: {
   message: AxelarMessage;
   payload: Bytes;
   sourceChainId: bigint;
-  sourceKind: AxelarRouteKind;
+  sourceKind: AxelarAddressKind;
 }): AxelarReceivePlan {
   const m = a.message;
   checkMessageBounds(m);
@@ -578,8 +581,8 @@ export function axelarReceiveSteps(a: {
     throw new Error("Expected exactly one proof per Axelar message");
   if (a.sourceChainId <= 0n)
     throw new Error("Source chain ID must be a nonzero u128");
-  if (a.sourceKind !== "evm" && a.sourceKind !== "stellar")
-    throw new Error("Remote route must be evm or stellar");
+  if (!KINDS.includes(a.sourceKind))
+    throw new Error("Unknown remote route kind");
   const sender = decodeAxelarAddress(m.source_address, a.sourceKind);
   const command = toBytes(axelarCommandId(m));
   const g = a.gateway;

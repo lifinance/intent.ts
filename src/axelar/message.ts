@@ -14,7 +14,6 @@ export type AxelarMessage = {
 };
 
 export type AxelarAddressKind = "evm" | "stellar" | "solana";
-export type AxelarRouteKind = Exclude<AxelarAddressKind, "solana">;
 
 /** Axelar `ChainNameRaw::MAX_LEN`. */
 export const AXELAR_MAX_CHAIN_NAME = 20;

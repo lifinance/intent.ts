@@ -78,9 +78,19 @@ export function deployment(
   const m = structuredClone(manifest);
   if (m.platform !== "solana" || m.oracle !== AXELAR_ORACLE_PROGRAM)
     throw new Error("Manifest must use the compiled Axelar program ID");
+  if (
+    typeof m.gateway !== "string" ||
+    typeof m.gasService !== "string" ||
+    typeof payer !== "string" ||
+    typeof m.rpcUrl !== "string"
+  )
+    throw new Error(
+      "Manifest gateway, gasService, rpcUrl and payer must be strings",
+    );
   new PublicKey(m.gateway);
   new PublicKey(m.gasService);
   new PublicKey(payer);
+  new URL(m.rpcUrl);
   if (
     typeof m.owner !== "string" ||
     m.owner === "11111111111111111111111111111111"

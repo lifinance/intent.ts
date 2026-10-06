@@ -40,6 +40,12 @@ describe("Stellar strkeys", () => {
     expect(isStellarContract(ACCOUNT)).toBe(false);
   });
 
+  it("decodes the client-vector contract recipient", () => {
+    expect(stellarStrkeyToBytes32(fixture.recipient)).toBe(
+      `0x${fixture.recipient_raw}`,
+    );
+  });
+
   it("rejects a corrupted checksum", () => {
     const corrupted = `${ACCOUNT.slice(0, 55)}A`;
     expect(() => stellarStrkeyToBytes32(corrupted)).toThrow(
@@ -59,6 +65,15 @@ describe("stellarAddressCommitment", () => {
   it("matches the intent-soroban client vector", () => {
     expect(stellarAddressCommitment(fixture.claimant)).toBe(
       `0x${fixture.claimant_commitment}`,
+    );
+  });
+
+  it("commits a contract address as ScVal::Address(Contract)", () => {
+    // Expected computed independently with @stellar/stellar-sdk:
+    // keccak256("OIF.Stellar.Address.v1" ‖ Address.fromString(c).toScVal().toXDR()),
+    // XDR = 0x00000012 ‖ 0x00000001 ‖ contractId.
+    expect(stellarAddressCommitment(CONTRACTS[0]![0])).toBe(
+      "0x526b5ad9265ba7d0d8c2b02fde9c7d715cdc93429bb81d33559cbee0ecfb7cd3",
     );
   });
 });

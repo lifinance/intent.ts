@@ -46,6 +46,13 @@
       "default": "./_cjs/axelar/index.js"
     }
   },
+  "typesVersions": {
+    "*": {
+      "axelar": [
+        "./_types/axelar/index.d.ts"
+      ]
+    }
+  },
   "sideEffects": false,
   "workspaces": [
     "relay/*"

@@ -25,6 +25,31 @@ function secret(name: string): string {
   return value;
 }
 const json = async (path: string) => JSON.parse(await readFile(path, "utf8"));
+// Parser errors can echo the secret (JSON, ethers, cosmjs do); replace them with a fixed message.
+async function redacted<T>(
+  message: string,
+  parse: () => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await parse();
+  } catch {
+    throw new Error(message);
+  }
+}
+async function solanaKeypair(): Promise<Keypair> {
+  const message =
+    "OIF_SOLANA_KEYPAIR_FILE must contain a JSON array of 64 bytes";
+  const bytes: unknown = await redacted(message, async () =>
+    JSON.parse(await readFile(secret("OIF_SOLANA_KEYPAIR_FILE"), "utf8")),
+  );
+  if (
+    !Array.isArray(bytes) ||
+    bytes.length !== 64 ||
+    !bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)
+  )
+    throw new Error(message);
+  return redacted(message, () => Keypair.fromSecretKey(Uint8Array.from(bytes)));
+}
 
 async function main() {
   const [command, file, ...args] = process.argv.slice(2);
@@ -61,15 +86,18 @@ async function main() {
       throw new Error("Solana genesis hash mismatch");
     deps.solana = {
       connection,
-      signer: Keypair.fromSecretKey(
-        Uint8Array.from(await json(secret("OIF_SOLANA_KEYPAIR_FILE"))),
-      ),
+      signer: await solanaKeypair(),
+      computeUnitPrice: d.computeUnitPrice,
     };
   } else if (d.platform === "evm")
     deps.evm = {
-      signer: new Wallet(
-        secret("OIF_EVM_PRIVATE_KEY"),
-        new JsonRpcProvider(d.rpcUrl),
+      signer: await redacted(
+        "OIF_EVM_PRIVATE_KEY must be a 32-byte hex private key",
+        () =>
+          new Wallet(
+            secret("OIF_EVM_PRIVATE_KEY"),
+            new JsonRpcProvider(d.rpcUrl),
+          ),
       ),
     };
   else
@@ -77,7 +105,10 @@ async function main() {
       server: new rpc.Server(d.rpcUrl, {
         allowHttp: d.rpcUrl.startsWith("http:"),
       }),
-      signer: StellarKeypair.fromSecret(secret("OIF_STELLAR_SECRET")),
+      signer: await redacted(
+        "OIF_STELLAR_SECRET must be a Stellar secret seed",
+        () => StellarKeypair.fromSecret(secret("OIF_STELLAR_SECRET")),
+      ),
     };
   const journalPath = `${file}.journal.json`;
   await exclusive(journalPath, async () => {
@@ -102,9 +133,12 @@ async function main() {
         throw new Pending(
           "Destination approval is not available; use relay for the full path",
         );
-      const wallet = await DirectSecp256k1HdWallet.fromMnemonic(
-        secret("OIF_AXELAR_MNEMONIC"),
-        { prefix: "axelar" },
+      const wallet = await redacted(
+        "OIF_AXELAR_MNEMONIC must be a valid BIP-39 mnemonic",
+        () =>
+          DirectSecp256k1HdWallet.fromMnemonic(secret("OIF_AXELAR_MNEMONIC"), {
+            prefix: "axelar",
+          }),
       );
       const client = await SigningCosmWasmClient.connectWithSigner(
         job.hub.rpcUrl,

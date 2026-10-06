@@ -19,6 +19,8 @@ export type ChainConfig = {
   gasService?: string;
   networkPassphrase?: string;
   genesisHash?: string;
+  /** Solana destination priority fee in microLamports per compute unit; omitted sends no SetComputeUnitPrice instruction. */
+  computeUnitPrice?: number;
 };
 export type HubConfig = {
   rpcUrl: string;
@@ -77,6 +79,11 @@ export function validateJob(job: Job): Job {
     if (c.platform === "solana") {
       new PublicKey(c.oracle);
       new PublicKey(c.gateway);
+      if (
+        c.computeUnitPrice !== undefined &&
+        (!Number.isSafeInteger(c.computeUnitPrice) || c.computeUnitPrice < 0)
+      )
+        throw new Error("Invalid Solana compute unit price");
     }
     if (c.platform === "stellar") {
       StrKey.decodeContract(c.oracle);
@@ -172,6 +179,36 @@ export function solanaEvents(
   return found;
 }
 
+const contractCall = new Interface([
+  "event ContractCall(address indexed sender,string destinationChain,string destinationContractAddress,bytes32 indexed payloadHash,bytes payload)",
+]);
+/**
+ * Gateway `ContractCall` events of one receipt. The message ID's event index is
+ * the log's position in the receipt (ampd reads `receipt.logs[event_index]`),
+ * not the block-level log index providers report.
+ */
+export function evmEvents(
+  logs: readonly { address: string; topics: readonly string[]; data: string }[],
+  txHash: string,
+  gateway: string,
+): SourceEvent[] {
+  return logs.flatMap((l, position) => {
+    if (l.address.toLowerCase() !== gateway.toLowerCase()) return [];
+    const event = contractCall.parseLog(l);
+    if (!event) return [];
+    return [
+      {
+        id: `${txHash.toLowerCase()}-${position}`,
+        source_address: event.args.sender,
+        destination_chain: event.args.destinationChain,
+        destination_address: event.args.destinationContractAddress,
+        payload_hash: event.args.payloadHash.slice(2),
+        payload: event.args.payload.slice(2),
+      },
+    ];
+  });
+}
+
 export async function extract(
   config: RelayConfig,
   txHash: string,
@@ -204,25 +241,7 @@ export async function extract(
     const finalized = await provider.getBlock("finalized");
     if (!finalized || tx.blockNumber > finalized.number)
       throw new Error("Source transaction is not finalized");
-    const abi = new Interface([
-      "event ContractCall(address indexed sender,string destinationChain,string destinationContractAddress,bytes32 indexed payloadHash,bytes payload)",
-    ]);
-    events = tx.logs
-      .filter((l) => l.address.toLowerCase() === source.gateway.toLowerCase())
-      .flatMap((l) => {
-        const event = abi.parseLog(l);
-        if (!event) return [];
-        return [
-          {
-            id: `${txHash.toLowerCase()}-${l.index}`,
-            source_address: event.args.sender,
-            destination_chain: event.args.destinationChain,
-            destination_address: event.args.destinationContractAddress,
-            payload_hash: event.args.payloadHash.slice(2),
-            payload: event.args.payload.slice(2),
-          },
-        ];
-      });
+    events = evmEvents(tx.logs, txHash, source.gateway);
   } else if (source.platform === "stellar") {
     const server = new rpc.Server(source.rpcUrl, {
       allowHttp: source.rpcUrl.startsWith("http:"),

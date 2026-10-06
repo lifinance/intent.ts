@@ -3,7 +3,7 @@ import { bytesToHex } from "viem";
 import fixture from "../../../tests/vectors/stellarClientOrder.json";
 import { stellarStrkeyToBytes32 } from "../../helpers/stellar";
 import type { StandardStellar } from "../../types";
-import { STELLAR_MAINNET_CHAIN_ID, STELLAR_NETWORK_IDS } from "../../constants";
+import { STELLAR_MAINNET_CHAIN_ID } from "../../constants";
 import { orderToIntent } from "../fromOrder";
 import {
   StandardStellarIntent,
@@ -86,9 +86,10 @@ describe("Stellar order encoding", () => {
       ...fixtureOrder(),
       originChainId: STELLAR_MAINNET_CHAIN_ID,
     };
+    // sha256("Public Global Stellar Network ; September 2015")
     expect(computeStandardStellarId(escrow, order)).toBe(
       stellarOrderId(
-        STELLAR_NETWORK_IDS[STELLAR_MAINNET_CHAIN_ID.toString()]!,
+        "0x7ac33997544e3175d266bd022439b22cdb16508c01163f26e5cb2a3e1045a979",
         escrow,
         order,
       ),

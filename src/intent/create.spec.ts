@@ -893,5 +893,50 @@ describe("Intent", () => {
         "is not a Stellar address commitment",
       );
     });
+
+    it("rejects a Stellar input whose outputs include the input chain among others", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(STELLAR_XLM, 5_000_000n), ctx(BASE_USDC, 1_000_000n)],
+          {
+            verifier: "axelar",
+            exclusiveFor: undefined,
+            account: STELLAR_USER,
+            outputRecipient: STELLAR_USER,
+          },
+        ),
+        axelarDeps,
+      );
+
+      expect(intent.isSameChain()).toBe(false);
+      expect(() => intent.singlechain()).toThrow(
+        /^Same-chain Stellar orders are not supported$/,
+      );
+    });
+
+    it("rejects a Stellar input with a non-axelar verifier", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(BASE_USDC, 1_000_000n)],
+          {
+            verifier: "polymer",
+            exclusiveFor: undefined,
+            account: STELLAR_USER,
+          },
+        ),
+        {
+          getOracle: (_verifier, chainId) =>
+            chainId === STELLAR_MAINNET_CHAIN_ID
+              ? STELLAR_AXELAR_ORACLE
+              : BASE_AXELAR_ORACLE,
+        },
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        /^Stellar orders require the axelar verifier$/,
+      );
+    });
   });
 });

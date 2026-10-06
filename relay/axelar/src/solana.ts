@@ -3,8 +3,10 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  SendTransactionError,
   Transaction,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import {
@@ -27,6 +29,36 @@ import type { Journal, StoredTransaction } from "./state";
 const MAX_TRANSACTION_BYTES = 1232;
 // Size checks only; never signed or sent.
 const PLACEHOLDER_BLOCKHASH = "11111111111111111111111111111111";
+// Simulation failures that say nothing about the instruction: retry with a fresh signature.
+const TRANSIENT_SIMULATION_ERRORS: Record<string, true> = {
+  BlockhashNotFound: true,
+  AccountInUse: true,
+  AlreadyProcessed: true,
+};
+// RPC message for a preflight (-32002) refusal; other RPC errors carry no verdict.
+const PREFLIGHT_REFUSAL = /^Transaction simulation failed/;
+
+// Simulates exact signed bytes: `Rejected` for a definitive refusal, a plain
+// `Error` for a transient one, `undefined` when the transaction would succeed.
+async function simulationRefusal(
+  connection: Connection,
+  raw: Uint8Array,
+): Promise<Error | undefined> {
+  const { err } = (
+    await connection.simulateTransaction(
+      VersionedTransaction.deserialize(raw),
+      {
+        sigVerify: true,
+        commitment: "finalized",
+      },
+    )
+  ).value;
+  if (!err) return undefined;
+  const reason = `Solana simulation failed: ${JSON.stringify(err)}`;
+  return typeof err === "string" && TRANSIENT_SIMULATION_ERRORS[err]
+    ? new Error(reason)
+    : new Rejected(reason);
+}
 
 /** Receive plan from `axelarReceiveSteps` bound to the configured destination gateway. */
 export type ReceiveContext = AxelarReceivePlan & { gateway: string };
@@ -50,20 +82,25 @@ export function instruction(ix: AxelarInstruction): TransactionInstruction {
   });
 }
 
+/** `computeUnitPrice` is a priority fee in microLamports per compute unit; omitted adds none. */
 export function transaction(
   ix: AxelarInstruction,
   payer: PublicKey | string,
   blockhash: string,
+  computeUnitPrice?: number,
 ): Transaction {
   const tx = new Transaction({
     feePayer: new PublicKey(payer),
     recentBlockhash: blockhash,
   });
-  tx.add(
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
-    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 0 }),
-    instruction(ix),
-  );
+  tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }));
+  if (computeUnitPrice !== undefined)
+    tx.add(
+      ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: computeUnitPrice,
+      }),
+    );
+  tx.add(instruction(ix));
   const raw = tx.serialize({
     requireAllSignatures: false,
     verifySignatures: false,
@@ -168,12 +205,14 @@ type SolanaStoredTransaction = StoredTransaction & {
 export async function sendStep({
   connection,
   signer,
+  computeUnitPrice,
   journal,
   step,
   context,
 }: {
   connection: Connection;
   signer: Keypair;
+  computeUnitPrice?: number;
   journal: Journal;
   step: AxelarStep;
   context: StepContext;
@@ -201,19 +240,46 @@ export async function sendStep({
           step.instruction,
           signer.publicKey,
           latest.blockhash,
+          computeUnitPrice,
         );
         tx.sign(signer);
+        const raw = tx.serialize();
+        // Preflight refusals surface from sendRawTransaction as SendTransactionError;
+        // simulate here so a definitive refusal signs and journals nothing, as on EVM/Stellar.
+        const refusal = await simulationRefusal(connection, raw);
+        if (refusal) throw refusal;
         return {
           id: bs58.encode(tx.signature!),
-          raw: tx.serialize().toString("base64"),
+          raw: raw.toString("base64"),
           ...latest,
         };
       },
       lookup,
       async (tx) => {
-        const signature = await connection.sendRawTransaction(
-          Buffer.from(tx.raw, "base64"),
-        );
+        let signature: string;
+        try {
+          signature = await connection.sendRawTransaction(
+            Buffer.from(tx.raw, "base64"),
+          );
+        } catch (error) {
+          // Resumed journal bytes skip prepare, and the destination may have changed since it ran.
+          // Classify a definitive preflight refusal; anything ambiguous keeps the original error.
+          // web3.js wraps every sendTransaction RPC error (node unhealthy, rate limits) in
+          // SendTransactionError; only the preflight's own refusal is evidence about the bytes.
+          if (
+            !(error instanceof SendTransactionError) ||
+            !PREFLIGHT_REFUSAL.test(error.transactionError.message)
+          )
+            throw error;
+          const status = (await connection.getSignatureStatuses([tx.id]))
+            .value[0];
+          if (status && !status.err) throw error;
+          const refusal = await simulationRefusal(
+            connection,
+            Buffer.from(tx.raw, "base64"),
+          );
+          throw refusal instanceof Rejected ? refusal : error;
+        }
         const result = await connection.confirmTransaction(
           {
             signature,

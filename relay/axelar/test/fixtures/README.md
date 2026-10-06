@@ -17,6 +17,7 @@ Primary sources:
 different types. The status query returns the latter. Do not derive expected RPC
 responses from constants in `src/hub.ts` when updating these fixtures.
 
-The tests substitute RPC and signing, but use the actual `hubTransaction`,
-transaction encoding and disk `Journal`. They exercise recovery without
-broadcasting or claiming to test a live provider quorum.
+`hub.test.ts` substitutes RPC and signing, but uses the actual `hubTransaction`,
+transaction encoding and disk `Journal`. `relay.test.ts` replaces hub
+transactions with fixed receipts and checks only `relayHub` request ordering and
+message identity. Neither broadcasts nor claims to test a live provider quorum.

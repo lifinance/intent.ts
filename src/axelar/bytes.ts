@@ -5,7 +5,8 @@ export type Hex = `0x${string}`;
 export type Bytes = Hex | Uint8Array;
 
 export const utf8 = new TextEncoder();
-const strictUtf8 = new TextDecoder("utf-8", { fatal: true });
+// `ignoreBOM` keeps a leading U+FEFF, as Rust `String::from_utf8` does.
+const strictUtf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 /** Accepts raw bytes or even-length hex with an optional `0x` prefix. */
 export function toBytes(value: Bytes | string): Uint8Array {

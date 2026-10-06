@@ -264,10 +264,19 @@ export class Intent {
         );
       }
       case "stellar": {
-        // The OutputSettler on Stellar has no local attestation path, so
-        // same-chain orders cannot be settled.
-        if (sameChain)
+        // The OutputSettler on Stellar has no local attestation path, so an
+        // output on the input chain cannot be settled — whether it is the only
+        // output or one of several spanning chains.
+        if (
+          this.outputs.some(
+            ({ token }) =>
+              token.chainId === inputChain &&
+              (token.chainNamespace ?? "eip155") === inputNamespace,
+          )
+        )
           throw new Error("Same-chain Stellar orders are not supported");
+        if (this.verifier !== "axelar")
+          throw new Error("Stellar orders require the axelar verifier");
         if (this.inputs.length > 4)
           throw new Error("Stellar orders support at most 4 inputs");
         if (!/^0x[0-9a-fA-F]{64}$/.test(this.walletUser))

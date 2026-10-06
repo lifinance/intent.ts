@@ -26,6 +26,26 @@ export type JournalState = {
 export const digest = (value: unknown): string =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
+// Endpoint and fee settings may change between runs without changing which message is relayed.
+const OPERATIONAL_KEYS: Record<string, true> = {
+  rpcUrl: true,
+  gasPrice: true,
+  computeUnitPrice: true,
+};
+const identity = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(identity)
+    : value !== null && typeof value === "object"
+      ? Object.fromEntries(
+          Object.entries(value)
+            .filter(([key]) => !Object.hasOwn(OPERATIONAL_KEYS, key))
+            .map(([key, item]) => [key, identity(item)]),
+        )
+      : value;
+
+/** Hash of the message, route, and contract identities; excludes RPC endpoints and fee settings. */
+export const jobHash = (job: unknown): string => digest(identity(job));
+
 export class Journal {
   state: JournalState;
 
@@ -33,7 +53,7 @@ export class Journal {
     readonly path: string,
     readonly job: unknown,
   ) {
-    this.state = { jobHash: digest(job), transactions: {} };
+    this.state = { jobHash: jobHash(job), transactions: {} };
   }
 
   async load(): Promise<this> {
@@ -42,7 +62,7 @@ export class Journal {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     }
-    if (this.state.jobHash !== digest(this.job))
+    if (this.state.jobHash !== jobHash(this.job))
       throw new Error(
         "Journal belongs to a different message or configuration",
       );
@@ -62,6 +82,13 @@ export class Journal {
       await file.close();
     }
     await rename(temp, this.path);
+    // Persist the rename itself; without a directory fsync a crash can revert to the old journal.
+    const dir = await open(dirname(this.path), "r");
+    try {
+      await dir.sync();
+    } finally {
+      await dir.close();
+    }
   }
 
   // Persist the exact signed bytes before broadcast. A lost response cannot trigger a new payment.

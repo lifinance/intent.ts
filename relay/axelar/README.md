@@ -66,6 +66,9 @@ Set `fullMessagePayloads` to its prover's `expect_full_message_payloads` setting
 The hub API target is the permissionless Amplifier gateway, voting verifier
 (`poll_by_message` support required), and multisig prover. This flow does not
 target legacy Axelar Core gateways. EVM execution targets the Amplifier gateway.
+For a Solana destination, optional `computeUnitPrice` (integer microlamports per
+compute unit) adds a `SetComputeUnitPrice` priority fee to each relay
+transaction; omit it to send without a priority fee.
 
 ## Before funding an order
 
@@ -80,10 +83,12 @@ rejecting transactions over 1,232 bytes before signing. Use
 non-consuming submission. Consuming mode requires the recorded rent recipient.
 Simulate the actual open/fill/claim transaction and check native rent/fees as well.
 
-Stellar `IntentClient` and `validateQuote` accept `axelarSolanaChainIds`; configure
-that list for every Solana route so oversize orders fail before funding. EVM
-applications call the same admission check before `open`. Generic escrow
-contracts cannot infer the selected transport's lower operational limits.
+Every application that opens or funds an order routed over Axelar to or from
+Solana (Stellar, EVM or Solana clients alike) must call
+`checkSolanaAxelarAdmission({ callbackBytes, contextBytes, sourceChainId,
+destinationChainId })` from `@lifi/intent/axelar` before `open`, so oversize
+orders fail before funding. Generic escrow contracts cannot infer the selected
+transport's lower operational limits.
 
 Solana `deployment(manifest, payer)` in `src/deployment.ts` validates the
 manifest and returns the `axelarInitializeInstruction` result, one
@@ -151,8 +156,12 @@ replacement never replays the rejected session's signed approval.
 
 Each pass reconciles gateway state. The adjacent journal atomically saves signed
 bytes before broadcasting and reuses those bytes after lost responses. Preserve
-it across restarts. A lock prevents concurrent writers to the same journal;
-another relayer may still finish on-chain first, which exact state checks handle.
+it across restarts. The journal is bound to the message, payload, chain names
+and IDs, contract addresses and network identifiers of the job; RPC URLs, the
+hub `gasPrice` and Solana `computeUnitPrice` are excluded, so they can be changed
+between passes without abandoning the journal. A lock prevents concurrent
+writers to the same journal; another relayer may still finish on-chain first,
+which exact state checks handle.
 Verification retries use a separate journal entry tied to the preceding poll.
 An outstanding signed verification request is reconciled before another attempt
 can be signed, even if another relayer has advanced the poll in the meantime.
