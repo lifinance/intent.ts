@@ -1,5 +1,6 @@
 import { base58 } from "@scure/base";
-import { keccak256 } from "viem";
+import { hexToBytes, keccak256 } from "viem";
+import { isStellarContract, stellarStrkeyToBytes32 } from "../helpers/stellar";
 import { BorshWriter, type Hex, bytes32, concat, pubkey, utf8 } from "./bytes";
 
 /** Axelar GMP message as returned by Amplifier APIs (snake_case wire names). */
@@ -104,17 +105,6 @@ export function writeMessage(w: BorshWriter, m: AxelarMessage): BorshWriter {
     .raw(messagePayloadHash(m));
 }
 
-const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-function crc16(bytes: Uint8Array): number {
-  let crc = 0;
-  for (const b of bytes) {
-    crc ^= b << 8;
-    for (let i = 0; i < 8; i++)
-      crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-  }
-  return crc;
-}
-
 /**
  * Strict Axelar transport address → 32-byte OIF identifier, matching
  * `oracle_axelar::address::decode`: lowercase-or-mixed `0x` + 40 hex for EVM
@@ -136,30 +126,9 @@ export function decodeAxelarAddress(
     for (let i = 0; i < 20; i++)
       out[12 + i] = parseInt(value.slice(2 + 2 * i, 4 + 2 * i), 16);
   } else {
-    if (value.length !== 56)
+    if (!isStellarContract(value))
       throw new Error("Invalid Stellar contract address");
-    const raw = new Uint8Array(35);
-    let acc = 0;
-    let bits = 0;
-    let j = 0;
-    for (const c of value) {
-      const digit = BASE32.indexOf(c);
-      if (digit < 0) throw new Error("Invalid Stellar contract address");
-      acc = ((acc << 5) | digit) & 0xffff;
-      bits += 5;
-      if (bits >= 8) {
-        bits -= 8;
-        raw[j++] = (acc >> bits) & 0xff;
-      }
-    }
-    const checksum = crc16(raw.subarray(0, 33));
-    if (
-      raw[0] !== 16 ||
-      raw[33] !== (checksum & 0xff) ||
-      raw[34] !== checksum >> 8
-    )
-      throw new Error("Invalid Stellar contract address");
-    out.set(raw.subarray(1, 33));
+    out.set(hexToBytes(stellarStrkeyToBytes32(value)));
   }
   return out;
 }

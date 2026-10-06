@@ -1,13 +1,21 @@
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
-import type { StandardOrder, StandardSolana, StandardEVM } from "../types";
+import { StandardStellarIntent } from "./stellar/standard.stellar";
+import type {
+  StandardOrder,
+  StandardSolana,
+  StandardEVM,
+  StandardStellar,
+} from "../types";
 import type { NAMESPACES } from "./types";
 
 type StandardIntentReturn<N extends NAMESPACES> = N extends "solana"
   ? StandardSolanaIntent
-  : N extends "eip155" | "tron"
-    ? StandardEVMIntent
-    : never;
+  : N extends "stellar"
+    ? StandardStellarIntent
+    : N extends "eip155" | "tron"
+      ? StandardEVMIntent
+      : never;
 
 export function asStandardIntent<N extends NAMESPACES>(arg: {
   namespace: N;
@@ -20,6 +28,12 @@ export function asStandardIntent<N extends NAMESPACES>(arg: {
     return new StandardSolanaIntent(
       inputSettler,
       order as StandardSolana,
+    ) as StandardIntentReturn<N>;
+
+  if (namespace === "stellar")
+    return new StandardStellarIntent(
+      inputSettler,
+      order as StandardStellar,
     ) as StandardIntentReturn<N>;
 
   if (namespace === "eip155" || namespace === "tron")
