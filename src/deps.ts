@@ -1,4 +1,4 @@
-export type CoreVerifier = "wormhole" | "polymer" | (string & {});
+export type CoreVerifier = "wormhole" | "polymer" | "axelar" | (string & {});
 
 export type IntentDeps = {
   getOracle: (

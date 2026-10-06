@@ -59,6 +59,51 @@ Current Solana support is limited to standard single-input orders on mainnet
 and devnet. Testnet has no configured deployment. Solana inputs are not
 supported in multichain or compact orders.
 
+## Stellar
+
+Stellar accounts (`G…`) and contracts (`C…`) use strkeys externally and their
+raw 32-byte key internally. Token addresses are the Stellar Asset Contract id:
+
+```ts
+import {
+  STELLAR_MAINNET_CHAIN_ID,
+  bytes32ToStellarAccount,
+  stellarStrkeyToBytes32,
+} from "@lifi/intent";
+
+const user = stellarStrkeyToBytes32(
+  "GACECBP42TXJ27YBF76XKLITYIE2ATBSHKV7CS2OQ6K6NAYXTSRHQPBV",
+);
+const xlm = {
+  address: stellarStrkeyToBytes32(
+    "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+  ),
+  name: "xlm",
+  chainId: STELLAR_MAINNET_CHAIN_ID,
+  decimals: 7,
+  chainNamespace: "stellar" as const,
+};
+
+console.log(bytes32ToStellarAccount(user));
+```
+
+A Stellar input yields a `StandardStellarIntent`, which escrows on the
+intent-soroban `InputEscrow`. Its `account` must be the user's 32-byte account key.
+`encodeStellarOrder` / `encodeStellarSolves` / `encodeStellarMandateOutput`
+produce the ScVal XDR the contracts take (`xdr.ScVal.fromXDR` turns them into
+stellar-sdk values). `orderId()` matches the escrow's `order_identifier`,
+pinned by `tests/vectors/stellarClientOrder.json` from intent-soroban.
+
+Stellar outputs settle on the Soroban `OutputSettler` and always carry the
+account recipient tag (`context` ends in `0x00`). Stellar routes require the
+`axelar` verifier. A Stellar-origin order pays the solver whose
+`stellarAddressCommitment(claimant)` was recorded at fill time, so fill and
+exclusivity identities for those orders are commitments, not padded EVM
+addresses.
+
+Current support is mainnet only. It covers G-account users and recipients,
+escrow orders with 1–4 inputs and outputs, and no same-chain Stellar orders.
+
 ## Axelar (Solana)
 
 `@lifi/intent/axelar` builds unsigned instructions for the Solana

@@ -8,6 +8,9 @@ import {
   SOLANA_OUTPUT_SETTLER_PDAS,
   SOLANA_POLYMER_ORACLE_PROGRAMS,
   SOLANA_POLYMER_ORACLES,
+  STELLAR_INPUT_ESCROWS,
+  STELLAR_NETWORK_IDS,
+  STELLAR_OUTPUT_SETTLERS,
   TRON_INPUT_SETTLER_PROGRAMS,
   TRON_OUTPUT_SETTLERS,
 } from "../../constants";
@@ -78,6 +81,27 @@ export function outputSettlerForTron(chainId: bigint): `0x${string}` {
   const settler = TRON_OUTPUT_SETTLERS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Tron chain id: ${chainId}`);
   return settler;
+}
+
+/** Returns the raw InputEscrow contract id for the given Stellar chain ID. Throws for undeployed networks. */
+export function inputSettlerForStellar(chainId: bigint): `0x${string}` {
+  const settler = STELLAR_INPUT_ESCROWS[chainId.toString()];
+  if (!settler) throw new Error(`Unsupported Stellar chain id: ${chainId}`);
+  return settler;
+}
+
+/** Returns the raw OutputSettler contract id — the value `MandateOutput.settler` must hold. Throws for undeployed networks. */
+export function outputSettlerForStellar(chainId: bigint): `0x${string}` {
+  const settler = STELLAR_OUTPUT_SETTLERS[chainId.toString()];
+  if (!settler) throw new Error(`Unsupported Stellar chain id: ${chainId}`);
+  return settler;
+}
+
+/** Returns the network id (sha256 of the passphrase) bound into Stellar order ids. Throws for undeployed networks. */
+export function networkIdForStellar(chainId: bigint): `0x${string}` {
+  const networkId = STELLAR_NETWORK_IDS[chainId.toString()];
+  if (!networkId) throw new Error(`Unsupported Stellar chain id: ${chainId}`);
+  return networkId;
 }
 
 export function inputSettlerForLock(

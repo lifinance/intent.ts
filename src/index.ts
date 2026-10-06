@@ -6,10 +6,14 @@ export * from "./validation";
 export * from "./helpers/convert";
 export * from "./helpers/tron";
 export * from "./helpers/solana";
+export * from "./helpers/stellar";
 export {
   inputSettlerForSolana,
   inputSettlerProgramForSolana,
+  inputSettlerForStellar,
+  networkIdForStellar,
   outputSettlerForSolana,
+  outputSettlerForStellar,
   polymerOracleForSolana,
   polymerOracleProgramForSolana,
 } from "./intent/helpers/shared";
