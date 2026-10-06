@@ -57,6 +57,10 @@
   "workspaces": [
     "relay/*"
   ],
+  "overrides": {
+    "ws": "^8.21.1",
+    "axios": "^1.20.0"
+  },
   "scripts": {
     "clean": "rm -rf _cjs _esm _types dist out",
     "prebuild": "bun run clean",
