@@ -1,8 +1,15 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  SOLANA_CHAIN_ID_PDA,
+  SOLANA_INTENTS_PROTOCOL_PROGRAM,
+  SOLANA_POLYMER_ORACLE_PDA,
+  SOLANA_POLYMER_ORACLE_PROGRAM,
+} from "../constants";
+import {
   SOLANA_ADDRESS_BYTES,
   bytes32ToSolanaBase58,
+  findSolanaProgramAddress,
   isSolanaBase58Address,
   solanaBase58ToBytes32,
 } from "./solana";
@@ -184,5 +191,34 @@ describe("isSolanaBase58Address", () => {
 describe("SOLANA_ADDRESS_BYTES", () => {
   it("is 32", () => {
     expect(SOLANA_ADDRESS_BYTES).toBe(32);
+  });
+});
+
+describe("findSolanaProgramAddress", () => {
+  // Canonical bumps pinned in constants.spec.ts; 253 means bumps 255 and 254
+  // land on the ed25519 curve and must be skipped.
+  it.each([
+    ["chain_id", SOLANA_INTENTS_PROTOCOL_PROGRAM, SOLANA_CHAIN_ID_PDA, 255],
+    ["polymer", SOLANA_POLYMER_ORACLE_PROGRAM, SOLANA_POLYMER_ORACLE_PDA, 253],
+  ] as const)(
+    "derives the %s PDA with its canonical bump",
+    (seed, program, expected, bump) => {
+      expect(
+        findSolanaProgramAddress(
+          [new TextEncoder().encode(seed)],
+          bytes32ToSolanaBase58(program),
+        ),
+      ).toEqual([bytes32ToSolanaBase58(expected), bump]);
+    },
+  );
+
+  it("rejects seeds Solana would refuse", () => {
+    const program = bytes32ToSolanaBase58(SOLANA_INTENTS_PROTOCOL_PROGRAM);
+    expect(() =>
+      findSolanaProgramAddress([new Uint8Array(33)], program),
+    ).toThrow();
+    expect(() =>
+      findSolanaProgramAddress(Array(16).fill(new Uint8Array(1)), program),
+    ).toThrow();
   });
 });

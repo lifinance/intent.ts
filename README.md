@@ -59,6 +59,78 @@ Current Solana support is limited to standard single-input orders on mainnet
 and devnet. Testnet has no configured deployment. Solana inputs are not
 supported in multichain or compact orders.
 
+## Stellar
+
+Stellar accounts (`G…`) and contracts (`C…`) use strkeys externally and their
+raw 32-byte key internally. Token addresses are the Stellar Asset Contract id:
+
+```ts
+import {
+  STELLAR_MAINNET_CHAIN_ID,
+  bytes32ToStellarAccount,
+  stellarStrkeyToBytes32,
+} from "@lifi/intent";
+
+const user = stellarStrkeyToBytes32(
+  "GACECBP42TXJ27YBF76XKLITYIE2ATBSHKV7CS2OQ6K6NAYXTSRHQPBV",
+);
+const xlm = {
+  address: stellarStrkeyToBytes32(
+    "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+  ),
+  name: "xlm",
+  chainId: STELLAR_MAINNET_CHAIN_ID,
+  decimals: 7,
+  chainNamespace: "stellar" as const,
+};
+
+console.log(bytes32ToStellarAccount(user));
+```
+
+A Stellar input yields a `StandardStellarIntent`, which escrows on the
+intent-soroban `InputEscrow`. Its `account` must be the user's 32-byte account key.
+`encodeStellarOrder` / `encodeStellarSolves` / `encodeStellarMandateOutput`
+produce the ScVal XDR the contracts take (`xdr.ScVal.fromXDR` turns them into
+stellar-sdk values). `orderId()` matches the escrow's `order_identifier`,
+pinned by `tests/vectors/stellarClientOrder.json` from intent-soroban.
+
+Stellar outputs settle on the Soroban `OutputSettler` and always carry the
+account recipient tag (`context` ends in `0x00`). Stellar routes require the
+`axelar` verifier. A Stellar-origin order pays the solver whose
+`stellarAddressCommitment(claimant)` was recorded at fill time, so fill and
+exclusivity identities for those orders are commitments, not padded EVM
+addresses.
+
+Current support is mainnet only. It covers G-account users and recipients,
+escrow orders with 1–4 inputs and outputs, and no same-chain Stellar orders.
+
+## Axelar (Solana)
+
+`@lifi/intent/axelar` builds unsigned instructions for the Solana
+`oracle_axelar` program (`FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw`) and the
+pinned Axelar 1.1.1 gateway and gas service. It never loads keys, contacts RPC
+or broadcasts. Instructions are `{ programId, keys, data }` with base58 keys and
+`0x` hex data.
+
+- Deployment: `axelarInitializeInstruction`, `axelarSetChainMappingInstruction`,
+  `axelarConfigAddress`, `axelarRouteAddress`, `decodeAxelarConfig`,
+  `decodeAxelarRoute`.
+- Source: `axelarSubmitInstruction` (`Relayed` with positive gas or `SelfRelay`
+  with zero; `consume` selects `submit_consume`), `axelarFundInstruction`.
+- Destination: `axelarApprovalSteps` turns prover `execute_data` into gateway
+  session, signature and approval transactions, refusing any approval other
+  than the expected single message; `axelarReceiveSteps` returns `execute` and
+  `register_proof`. The standard Axelar executor cannot fund `register_proof`,
+  so settlement after paid relaying still needs a caller to submit it.
+- Before funding an order: `checkSolanaAxelarAdmission` (one proof of at most
+  320 bytes per message, nonzero u128 chain IDs).
+
+Outputs are byte-identical to the reference builder in lifi-intent-svm
+(`axelar_litesvm/src/client_vectors.rs`); `tests/vectors/axelarClientVectors.json`
+is copied from there and must be refreshed whenever the program ABI changes.
+The caller-operated relay that drives these steps end to end lives in
+[`relay/axelar`](relay/axelar/README.md) (private workspace package).
+
 ## Architecture
 
 - `types.ts`
@@ -202,6 +274,7 @@ These utilities are the core gate for normalizing and validating inbound order d
 - `src/validation.ts`
 - `src/api/intentApi.ts`
 - `src/typedMessage.ts`
+- `src/axelar/index.ts`
 
 ### Explicit EVM oracle quotes
 

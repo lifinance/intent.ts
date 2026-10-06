@@ -1,0 +1,100 @@
+{
+  "provenance": {
+    "revision": "21bdc767f23412c5ae9e76c5ea94813db48209da",
+    "source": "https://github.com/axelarnetwork/axelar-amplifier/blob/21bdc767f23412c5ae9e76c5ea94813db48209da/packages/axelar-wasm-std/src/verification.rs",
+    "sourceSha256": "9c766ad05cd827dac1a72cddcc074a4bdcbbae066ce00497f2753b337db67420",
+    "method": "Enum variants extracted from pinned upstream Rust; cw_serde snake_case serialization. Message values are synthetic; response shape is voting-verifier MessageStatus."
+  },
+  "responses": {
+    "succeeded_on_source_chain": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "succeeded_on_source_chain"
+      }
+    ],
+    "failed_on_source_chain": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "failed_on_source_chain"
+      }
+    ],
+    "not_found_on_source_chain": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "not_found_on_source_chain"
+      }
+    ],
+    "failed_to_verify": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "failed_to_verify"
+      }
+    ],
+    "in_progress": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "in_progress"
+      }
+    ],
+    "unknown": [
+      {
+        "message": {
+          "cc_id": {
+            "source_chain": "stellar",
+            "message_id": "0x1111111111111111111111111111111111111111111111111111111111111111-0"
+          },
+          "source_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+          "destination_chain": "solana",
+          "destination_address": "FHMjUtWovj3KvMea62D2api8HaJy8oGye4UFzsGKZHvw",
+          "payload_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+        },
+        "status": "unknown"
+      }
+    ]
+  }
+}

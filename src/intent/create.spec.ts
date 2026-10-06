@@ -12,6 +12,9 @@ import {
   TRON_MAINNET_CHAIN_ID,
   TRON_MAINNET_INPUT_SETTLER,
   TRON_MAINNET_OUTPUT_SETTLER,
+  STELLAR_INPUT_ESCROWS,
+  STELLAR_MAINNET_CHAIN_ID,
+  STELLAR_OUTPUT_SETTLERS,
 } from "../constants";
 import { addressToBytes32 } from "../helpers/convert";
 import type { IntentDeps } from "../deps";
@@ -33,6 +36,7 @@ import { Intent } from "./create";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
+import { StandardStellarIntent } from "./stellar/standard.stellar";
 
 const originalDateNow = Date.now;
 const originalMathRandom = Math.random;
@@ -743,6 +747,195 @@ describe("Intent", () => {
 
       expect(() => intent.multichain()).toThrow(
         "Multichain orders only support eip155 inputs",
+      );
+    });
+  });
+
+  describe("Stellar singlechain", () => {
+    const BASE_AXELAR_ORACLE =
+      "0xb7eA767b54aF5Dd8AD12Df648A399F9075D93FeE" as const;
+    const STELLAR_AXELAR_ORACLE =
+      "0x2a9746edd91c73f4c63b95ef626f0d0ad40ac6901dba0686f4a5fed64c359048" as const;
+    const STELLAR_USER = `0x${"01".repeat(32)}` as const;
+    const STELLAR_KEY = STELLAR_MAINNET_CHAIN_ID.toString();
+
+    const axelarDeps: IntentDeps = {
+      getOracle(verifier, chainId) {
+        if (verifier !== "axelar") return undefined;
+        if (chainId === CHAIN_ID_BASE) return BASE_AXELAR_ORACLE;
+        if (chainId === STELLAR_MAINNET_CHAIN_ID) return STELLAR_AXELAR_ORACLE;
+        return undefined;
+      },
+    };
+
+    const STELLAR_XLM: CoreToken = {
+      address:
+        "0x25b4fcd859aec2fa6348438c489b3c3c10c98b6d21be4fd3cb30cb68953ef977",
+      name: "xlm",
+      chainId: STELLAR_MAINNET_CHAIN_ID,
+      decimals: 7,
+      chainNamespace: "stellar",
+    };
+
+    it("routes an EVM->Stellar output to the Stellar settler and oracle", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(BASE_USDC, 1_000_000n)],
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          {
+            verifier: "axelar",
+            exclusiveFor: undefined,
+            outputRecipient: STELLAR_USER,
+          },
+        ),
+        axelarDeps,
+      );
+      const result = intent.singlechain();
+      const order = result.asOrder();
+
+      expect(result).toBeInstanceOf(StandardEVMIntent);
+      expect(order.inputOracle).toBe(BASE_AXELAR_ORACLE);
+      expect(order.outputs[0]!.settler).toBe(
+        STELLAR_OUTPUT_SETTLERS[STELLAR_KEY]!,
+      );
+      expect(order.outputs[0]!.oracle).toBe(STELLAR_AXELAR_ORACLE);
+      expect(order.outputs[0]!.recipient).toBe(STELLAR_USER);
+      expect(order.outputs[0]!.context).toBe("0x00");
+    });
+
+    it("appends the account recipient tag after exclusivity context", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(BASE_USDC, 1_000_000n)],
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          { verifier: "axelar", outputRecipient: STELLAR_USER },
+        ),
+        axelarDeps,
+      );
+      const { context } = intent.singlechain().asOrder().outputs[0]!;
+
+      expect(context).toBe(
+        `0xe0${addressToBytes32(TEST_USER).slice(2)}${(TEST_NOW_SECONDS + 60).toString(16).padStart(8, "0")}00`,
+      );
+    });
+
+    it("returns a StandardStellarIntent for a Stellar input", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(BASE_USDC, 1_000_000n)],
+          {
+            verifier: "axelar",
+            exclusiveFor: undefined,
+            account: STELLAR_USER,
+          },
+        ),
+        axelarDeps,
+      );
+      const result = intent.singlechain();
+      const order = result.asOrder();
+
+      expect(result).toBeInstanceOf(StandardStellarIntent);
+      expect(result.inputSettler).toBe(STELLAR_INPUT_ESCROWS[STELLAR_KEY]!);
+      expect(order.user).toBe(STELLAR_USER);
+      expect(order.inputOracle).toBe(STELLAR_AXELAR_ORACLE);
+      expect(order.inputs).toEqual([
+        [BigInt(STELLAR_XLM.address), 10_000_000n],
+      ]);
+      expect(order.outputs[0]!.oracle).toBe(
+        addressToBytes32(BASE_AXELAR_ORACLE),
+      );
+      expect(order.outputs[0]!.settler).toBe(addressToBytes32(COIN_FILLER));
+      expect(order.outputs[0]!.context).toBe("0x");
+    });
+
+    it("rejects a Stellar output with a non-axelar verifier", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(BASE_USDC, 1_000_000n)],
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          { exclusiveFor: undefined, outputRecipient: STELLAR_USER },
+        ),
+        intentDeps,
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        "Stellar outputs require the axelar verifier",
+      );
+    });
+
+    it("rejects a Stellar input whose account is an EVM address", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(BASE_USDC, 1_000_000n)],
+          { verifier: "axelar", exclusiveFor: undefined },
+        ),
+        axelarDeps,
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        "Stellar orders need the user's 32-byte account key",
+      );
+    });
+
+    it("rejects an EVM-shaped exclusive solver on a Stellar input", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(BASE_USDC, 1_000_000n)],
+          { verifier: "axelar", account: STELLAR_USER },
+        ),
+        axelarDeps,
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        "is not a Stellar address commitment",
+      );
+    });
+
+    it("rejects a Stellar input whose outputs include the input chain among others", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(STELLAR_XLM, 5_000_000n), ctx(BASE_USDC, 1_000_000n)],
+          {
+            verifier: "axelar",
+            exclusiveFor: undefined,
+            account: STELLAR_USER,
+            outputRecipient: STELLAR_USER,
+          },
+        ),
+        axelarDeps,
+      );
+
+      expect(intent.isSameChain()).toBe(false);
+      expect(() => intent.singlechain()).toThrow(
+        /^Same-chain Stellar orders are not supported$/,
+      );
+    });
+
+    it("rejects a Stellar input with a non-axelar verifier", () => {
+      const intent = new Intent(
+        makeEscrowOptions(
+          [ctx(STELLAR_XLM, 10_000_000n)],
+          [ctx(BASE_USDC, 1_000_000n)],
+          {
+            verifier: "polymer",
+            exclusiveFor: undefined,
+            account: STELLAR_USER,
+          },
+        ),
+        {
+          getOracle: (_verifier, chainId) =>
+            chainId === STELLAR_MAINNET_CHAIN_ID
+              ? STELLAR_AXELAR_ORACLE
+              : BASE_AXELAR_ORACLE,
+        },
+      );
+
+      expect(() => intent.singlechain()).toThrow(
+        /^Stellar orders require the axelar verifier$/,
       );
     });
   });

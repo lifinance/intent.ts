@@ -8,6 +8,7 @@ import type {
   MultichainOrder,
   StandardEVM,
   StandardSolana,
+  StandardStellar,
   TokenContext,
 } from "../types/index";
 import { MultichainOrderIntent } from "./evm/multichain.evm";
@@ -19,12 +20,14 @@ import {
   ONE_MINUTE,
   inputSettlerForLock,
   inputSettlerForSolana,
+  inputSettlerForStellar,
   outputSettlerForSolana,
   outputSettlerForTron,
   inputSettlerForTron,
 } from "./helpers/shared";
 import { addressToBytes32 } from "../helpers/convert";
 import { StandardSolanaIntent } from "./solana/standard.solana";
+import { StandardStellarIntent } from "./stellar/standard.stellar";
 
 /**
  * @notice Class representing a Li.Fi Intent. Contains intent abstractions and helpers.
@@ -258,6 +261,58 @@ export class Intent {
           inputSettlerForTron(inputChain),
           tronOrder,
           "tron",
+        );
+      }
+      case "stellar": {
+        // The OutputSettler on Stellar has no local attestation path, so an
+        // output on the input chain cannot be settled — whether it is the only
+        // output or one of several spanning chains.
+        if (
+          this.outputs.some(
+            ({ token }) =>
+              token.chainId === inputChain &&
+              (token.chainNamespace ?? "eip155") === inputNamespace,
+          )
+        )
+          throw new Error("Same-chain Stellar orders are not supported");
+        if (this.verifier !== "axelar")
+          throw new Error("Stellar orders require the axelar verifier");
+        if (this.inputs.length > 4)
+          throw new Error("Stellar orders support at most 4 inputs");
+        if (!/^0x[0-9a-fA-F]{64}$/.test(this.walletUser))
+          throw new Error("Stellar orders need the user's 32-byte account key");
+        const stellarInputOracle = this.getOracle(this.verifier, inputChain);
+        if (!stellarInputOracle)
+          throw new Error(
+            `No oracle configured for verifier "${this.verifier}" on chain ${inputChain}`,
+          );
+        const stellarOrder: StandardStellar = {
+          user: this.walletUser,
+          nonce: this.nonce(),
+          originChainId: inputChain,
+          fillDeadline: currentTime + this.fillDeadline,
+          expires: currentTime + this.expiry,
+          inputOracle: stellarInputOracle,
+          inputs: this.inputs.map(({ token, amount }) => [
+            BigInt(token.address),
+            amount,
+          ]),
+          outputs: buildMandateOutputs({
+            exclusiveFor: this.exclusiveFor,
+            outputTokens: this.outputs,
+            getOracle: this.getOracle,
+            verifier: this.verifier,
+            inputChainId: inputChain,
+            inputNamespace,
+            sameChain,
+            recipient,
+            currentTime,
+            exclusivity: this.exclusivity,
+          }),
+        };
+        return new StandardStellarIntent(
+          inputSettlerForStellar(inputChain),
+          stellarOrder,
         );
       }
       default: {

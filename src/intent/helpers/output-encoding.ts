@@ -1,4 +1,9 @@
-import { encodeAbiParameters, encodePacked, parseAbiParameters } from "viem";
+import {
+  concat,
+  encodeAbiParameters,
+  encodePacked,
+  parseAbiParameters,
+} from "viem";
 import { COIN_FILLER } from "../../constants";
 import type { CoreVerifier, IntentDeps } from "../../deps";
 import { addressToBytes32 } from "../../helpers/convert";
@@ -7,6 +12,7 @@ import {
   ONE_MINUTE,
   outputSettlerForSolana,
   outputSettlerForTron,
+  outputSettlerForStellar,
   polymerOracleProgramForSolana,
 } from "./shared";
 
@@ -52,12 +58,15 @@ function exclusiveForForInput(
   }
   const bytes32 = addressToBytes32(exclusiveFor);
   const isEvmShaped = bytes32.slice(2, 26) === "0".repeat(24);
-  if (inputNamespace === "solana" && isEvmShaped) {
+  const needsKey = inputNamespace === "solana" || inputNamespace === "stellar";
+  if (needsKey && isEvmShaped) {
     throw new Error(
-      `ExclusiveFor ${exclusiveFor} is not a Solana pubkey: a solana-origin order finalises only for the solver that signs on Solana, so a padded EVM address makes the order fillable but impossible to settle. Pass the solver's 32-byte pubkey (solanaBase58ToBytes32).`,
+      inputNamespace === "solana"
+        ? `ExclusiveFor ${exclusiveFor} is not a Solana pubkey: a solana-origin order finalises only for the solver that signs on Solana, so a padded EVM address makes the order fillable but impossible to settle. Pass the solver's 32-byte pubkey (solanaBase58ToBytes32).`
+        : `ExclusiveFor ${exclusiveFor} is not a Stellar address commitment: a stellar-origin order finalises only for the claimant whose commitment matches the fill, so a padded EVM address makes the order fillable but impossible to settle. Pass stellarAddressCommitment(solver).`,
     );
   }
-  if (inputNamespace !== "solana" && !isEvmShaped) {
+  if (!needsKey && !isEvmShaped) {
     throw new Error(
       `ExclusiveFor ${exclusiveFor} is not a ${inputNamespace} address: the ${inputNamespace} input settler pays out to the low 20 bytes, so a 32-byte key would be truncated to an address nobody holds.`,
     );
@@ -112,9 +121,13 @@ export function buildMandateOutputs(options: {
       outputSettler = outputSettlerForSolana(token.chainId);
     } else if (token.chainNamespace === "tron") {
       outputSettler = outputSettlerForTron(token.chainId);
+    } else if (token.chainNamespace === "stellar") {
+      outputSettler = outputSettlerForStellar(token.chainId);
     } else {
       outputSettler = COIN_FILLER;
     }
+    if (token.chainNamespace === "stellar" && verifier !== "axelar")
+      throw new Error("Stellar outputs require the axelar verifier");
     let outputOracle: `0x${string}`;
     if (sameChain) {
       outputOracle = addressToBytes32(outputSettler);
@@ -176,7 +189,12 @@ export function buildMandateOutputs(options: {
       amount: amount,
       recipient,
       callbackData: "0x",
-      context,
+      // The Stellar OutputSettler reads a recipient tag after the pricing
+      // context; 0x00 marks a plain account (`G…`) recipient.
+      context:
+        token.chainNamespace === "stellar"
+          ? concat([context, "0x00"])
+          : context,
     };
   }) as MandateOutput[];
 }

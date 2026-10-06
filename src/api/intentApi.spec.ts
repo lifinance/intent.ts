@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { INPUT_SETTLER_ESCROW_LIFI } from "../constants";
+import {
+  INPUT_SETTLER_ESCROW_LIFI,
+  STELLAR_MAINNET_CHAIN_ID,
+} from "../constants";
 import { isStandardOrder } from "../intent";
 import {
   bytes32ToSolanaBase58,
@@ -300,6 +303,20 @@ describe("IntentApi HTTP", () => {
     globalThis.fetch = originalFetch;
   });
 
+  function captureQuoteBody() {
+    const captured = { body: "" };
+    globalThis.fetch = (async (input, init) => {
+      const request =
+        input instanceof Request ? input : new Request(input.toString(), init);
+      captured.body = await request.clone().text();
+      return new Response(JSON.stringify({ quotes: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+    return captured;
+  }
+
   it("sends order query params with defaults", async () => {
     const api = new IntentApi(true);
     globalThis.fetch = (async (input, init) => {
@@ -521,22 +538,6 @@ describe("IntentApi HTTP", () => {
       "0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61";
     const SOLANA_CHAIN_ID = 1151111081099710n;
 
-    function captureQuoteBody() {
-      const captured = { body: "" };
-      globalThis.fetch = (async (input, init) => {
-        const request =
-          input instanceof Request
-            ? input
-            : new Request(input.toString(), init);
-        captured.body = await request.clone().text();
-        return new Response(JSON.stringify({ quotes: [] }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }) as typeof fetch;
-      return captured;
-    }
-
     it("re-encodes 32-byte hex to base58 for a solana output", async () => {
       const captured = captureQuoteBody();
       await new IntentApi(false).getQuotes({
@@ -733,6 +734,118 @@ describe("IntentApi HTTP", () => {
           ],
         }),
       ).rejects.toThrow("is not a Solana address");
+    });
+  });
+
+  describe("stellar namespace addresses", () => {
+    const STELLAR_CHAIN_ID = STELLAR_MAINNET_CHAIN_ID;
+    // Account and contract strkeys with their raw keys, as in the
+    // intent-soroban mainnet deployment and client vectors.
+    const ACCOUNT = "GAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQDZ7H";
+    const ACCOUNT_RAW = `0x${"01".repeat(32)}` as const;
+    const CONTRACT = "CA5GTK5U5LYGWIJSAG6LD724NUDFONHVEHYOHOH5KWCKCX5I442QYLUN";
+    const CONTRACT_RAW =
+      "0x3a69abb4eaf06b213201bcb1ff5c6d065734f521f0e3b8fd5584a15fa8e7350c";
+    const SOLVER_COMMITMENT =
+      "0xf83c1a5986c99205af4022890cad15845625c1b0bbe942b377dd010945ae3da2";
+
+    it("sends a Stellar input as strkeys and keeps the 32-byte solver commitment", async () => {
+      const captured = captureQuoteBody();
+      await new IntentApi(false).getQuotes({
+        user: ACCOUNT_RAW,
+        userChainId: STELLAR_CHAIN_ID,
+        userNamespace: "stellar",
+        exclusiveFor: [SOLVER_COMMITMENT],
+        inputs: [
+          {
+            sender: ACCOUNT_RAW,
+            asset: CONTRACT_RAW,
+            chainId: STELLAR_CHAIN_ID,
+            namespace: "stellar",
+            amount: 10_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver: "0x1111111111111111111111111111111111111111",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            chainId: 8453,
+            amount: 0n,
+          },
+        ],
+      });
+
+      const body = JSON.parse(captured.body);
+      expect(body.user).toEqual({
+        chain: `stellar:${STELLAR_CHAIN_ID}`,
+        address: ACCOUNT,
+      });
+      expect(body.intent.inputs[0]).toEqual({
+        chain: `stellar:${STELLAR_CHAIN_ID}`,
+        user: ACCOUNT,
+        asset: CONTRACT,
+        amount: "10000000",
+      });
+      expect(body.intent.metadata.exclusiveFor).toEqual([SOLVER_COMMITMENT]);
+    });
+
+    it("passes Stellar output strkeys through and converts a 32-byte asset", async () => {
+      const captured = captureQuoteBody();
+      await new IntentApi(false).getQuotes({
+        user: "0x1111111111111111111111111111111111111111",
+        userChainId: 8453,
+        inputs: [
+          {
+            sender: "0x1111111111111111111111111111111111111111",
+            asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            chainId: 8453,
+            amount: 1_000_000n,
+          },
+        ],
+        outputs: [
+          {
+            receiver: CONTRACT,
+            asset: CONTRACT_RAW,
+            chainId: STELLAR_CHAIN_ID,
+            namespace: "stellar",
+            amount: 0n,
+          },
+        ],
+      });
+
+      expect(JSON.parse(captured.body).intent.outputs[0]).toEqual({
+        chain: `stellar:${STELLAR_CHAIN_ID}`,
+        receiver: CONTRACT,
+        asset: CONTRACT,
+        amount: "0",
+      });
+    });
+
+    it("rejects a 32-byte Stellar receiver whose kind is ambiguous", async () => {
+      captureQuoteBody();
+      await expect(
+        new IntentApi(false).getQuotes({
+          user: "0x1111111111111111111111111111111111111111",
+          userChainId: 8453,
+          inputs: [
+            {
+              sender: "0x1111111111111111111111111111111111111111",
+              asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+              chainId: 8453,
+              amount: 1_000_000n,
+            },
+          ],
+          outputs: [
+            {
+              receiver: ACCOUNT_RAW,
+              asset: CONTRACT,
+              chainId: STELLAR_CHAIN_ID,
+              namespace: "stellar",
+              amount: 0n,
+            },
+          ],
+        }),
+      ).rejects.toThrow(/may be an account or a contract — pass the strkey/);
     });
   });
 });

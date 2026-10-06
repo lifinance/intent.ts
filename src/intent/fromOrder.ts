@@ -7,6 +7,7 @@ import type {
 import { MultichainOrderIntent } from "./evm/multichain.evm";
 import { StandardEVMIntent } from "./evm/standard.evm";
 import { StandardSolanaIntent } from "./solana/standard.solana";
+import { StandardStellarIntent } from "./stellar/standard.stellar";
 import { asMultichainIntent } from "./multichain";
 import { asStandardIntent } from "./standard";
 
@@ -18,6 +19,7 @@ export function isStandardOrder(
 
 type OrderToIntentOptions =
   | { namespace: "solana"; inputSettler: `0x${string}`; order: StandardOrder }
+  | { namespace: "stellar"; inputSettler: `0x${string}`; order: StandardOrder }
   | { namespace: "tron"; inputSettler: `0x${string}`; order: StandardOrder }
   | {
       namespace: "eip155";
@@ -31,6 +33,11 @@ export function orderToIntent(options: {
   inputSettler: `0x${string}`;
   order: StandardOrder;
 }): StandardSolanaIntent;
+export function orderToIntent(options: {
+  namespace: "stellar";
+  inputSettler: `0x${string}`;
+  order: StandardOrder;
+}): StandardStellarIntent;
 export function orderToIntent(options: {
   namespace: "tron";
   inputSettler: `0x${string}`;
@@ -49,10 +56,18 @@ export function orderToIntent(options: {
 }): MultichainOrderIntent;
 export function orderToIntent(
   options: OrderToIntentOptions,
-): StandardEVMIntent | StandardSolanaIntent | MultichainOrderIntent {
+):
+  | StandardEVMIntent
+  | StandardSolanaIntent
+  | StandardStellarIntent
+  | MultichainOrderIntent {
   const { namespace, inputSettler, order } = options;
 
   if (namespace === "solana") {
+    return asStandardIntent({ namespace, order, inputSettler });
+  }
+
+  if (namespace === "stellar") {
     return asStandardIntent({ namespace, order, inputSettler });
   }
 
