@@ -97,16 +97,21 @@ the program upgrade authority. The initializing `payer` must be the upgrade
 authority; the manifest's `owner` becomes the mapping owner, who signs every
 mapping (`chainMapping(route, owner)` builds later additions) and can transfer
 (`axelarTransferOwnershipInstruction`) or renounce
-(`axelarRenounceOwnershipInstruction`) ownership. Route kinds are `evm`,
-`stellar` or `solana`; Solana-kind routes need a nonzero `destinationConfig` on
-`axelarSubmitInstruction`. Chain names
-are lowercase Axelar names of at most 20 bytes; mappings are set once and cannot
-change. Verify the program ID, protocol chain ID and gateway deployment before
-initializing; revoke upgrade authority after initialization. Exported source
-oracle is the program ID, while the receiving input-oracle identifier is its
-configuration PDA. `axelarConfigAddress()` derives that PDA for EVM/Stellar
-submissions; `axelarRouteAddress(name)` derives a chain's mapping account, and
-`decodeAxelarConfig` / `decodeAxelarRoute` read them back.
+(`axelarRenounceOwnershipInstruction`) ownership. Chain names follow
+`checkAxelarChainName` (1–32 bytes, no NUL, no ASCII uppercase, as EVM
+`setChainMap`); inbound source names map after ASCII lowercasing. Mappings are
+set once and cannot change. `axelarSubmitInstruction` sends by destination chain
+ID to a verbatim recipient string; a nonzero `destinationConfig` (the remote
+Solana configuration PDA) selects the executable envelope and a zero one sends
+the raw message. Axelar gateways accept any destination and recipient
+synchronously and reject unroutable ones only later, after gas is paid. Verify
+the program ID, protocol chain ID and gateway deployment before initializing;
+revoke upgrade authority after initialization. Exported source oracle is the
+program ID, while the receiving input-oracle identifier is its configuration
+PDA. `axelarConfigAddress()` derives that PDA for EVM/Stellar submissions;
+`axelarRouteAddress(name)` and `axelarRouteChainAddress(chainId)` derive a
+chain's two mapping accounts, and `decodeAxelarConfig` / `decodeAxelarRoute`
+read them back.
 
 ## Relay and resume
 

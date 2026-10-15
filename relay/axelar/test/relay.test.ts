@@ -68,7 +68,6 @@ function fixture() {
     gateway,
     payer,
     sourceChainId: 2n,
-    sourceKind: "stellar" as const,
     message,
     payload: envelope,
   };
@@ -99,7 +98,7 @@ test("library builds bounded standard execution and registration transactions", 
     chainId: "9",
     chainName: "solana",
     rpcUrl: "http://localhost:8899",
-    routes: [{ name: "stellar", chainId: "2", kind: "stellar" }],
+    routes: [{ name: "stellar", chainId: "2" }],
   };
   const config = deployment(manifest, payer);
   expect(config.inputOracle).toBe(axelarConfigAddress());
@@ -107,9 +106,15 @@ test("library builds bounded standard execution and registration transactions", 
   for (const ix of [config.initialize, ...config.mappings])
     transaction(ix, payer, blockhash);
   expect(() => deployment({ ...manifest, chainName: "Solana" }, payer)).toThrow(
-    /local chain name/,
+    /without NUL or ASCII uppercase/,
   );
-  const duplicate = { name: "base", chainId: "2", kind: "evm" };
+  expect(() =>
+    deployment(
+      { ...manifest, routes: [{ name: "ba\0se", chainId: "3" }] },
+      payer,
+    ),
+  ).toThrow(/without NUL or ASCII uppercase/);
+  const duplicate = { name: "base", chainId: "2" };
   expect(() =>
     deployment({ ...manifest, routes: [...manifest.routes, duplicate] }, payer),
   ).toThrow(/duplicate/);
@@ -118,14 +123,14 @@ test("library builds bounded standard execution and registration transactions", 
   expect(() => deployment({ ...manifest, chainId: unsafe }, payer)).toThrow(
     /decimal strings/,
   );
-  expect(() =>
-    chainMapping({ name: "base", chainId: unsafe, kind: "evm" }, payer),
-  ).toThrow(/decimal strings/);
+  expect(() => chainMapping({ name: "base", chainId: unsafe }, payer)).toThrow(
+    /decimal strings/,
+  );
   const exact = chainMapping(
-    { name: "base", chainId: "9007199254740993", kind: "evm" },
+    { name: "base", chainId: "9007199254740993" },
     payer,
   );
-  // Data: discriminator[8] || name (u32 length + "base") || chain_id u128LE || kind.
+  // Data: discriminator[8] || name (u32 length + "base") || chain_id u128LE.
   const id = Buffer.from(exact.data.slice(2), "hex").subarray(16, 32);
   expect(id.readBigUInt64LE(0)).toBe(9007199254740993n);
 });
@@ -290,14 +295,13 @@ test("receive context binds the immutable oracle configuration and source mappin
       new PublicKey(c.gateway ?? gateway).toBuffer(),
       new PublicKey(gasService).toBuffer(),
     ]);
-  // AxelarRoute: discriminator || bump || name || chain_id u128 || kind (evm, stellar, solana).
-  const route = (r: { name?: string; chainId?: bigint; kind?: number }) =>
+  // AxelarRoute: discriminator || bump || name || chain_id u128.
+  const route = (r: { name?: string; chainId?: bigint }) =>
     Buffer.concat([
       anchorDiscriminator("account", "AxelarRoute"),
       Buffer.from([255]),
       str(r.name ?? j.message.cc_id.source_chain),
       u128(r.chainId ?? 2n),
-      Buffer.from([r.kind ?? 1]),
     ]);
   const program = new PublicKey(AXELAR_ORACLE_PROGRAM);
   const reader = (
@@ -334,10 +338,9 @@ test("receive context binds the immutable oracle configuration and source mappin
   const mapping = /Source chain mapping mismatch/;
   await rejects(reader(config({}), route({ name: "other" })), mapping);
   await rejects(reader(config({}), route({ chainId: 3n })), mapping);
-  await rejects(reader(config({}), route({ kind: 0 })), mapping);
-  // A Solana-kind mapping is rejected even when the job claims a Solana source.
+  // Solana-to-Solana delivery is never relayed through Axelar.
   j.source = { ...j.source, platform: "solana" };
-  await rejects(reader(config({}), route({ kind: 2 })), mapping);
+  await rejects(reader(config({}), route({})), mapping);
 });
 
 test("journal resumes ambiguous broadcast with the identical signed bytes", async () => {
@@ -666,8 +669,9 @@ test("maximum source proofs fit paid and self-relay exports including consuming 
         payer,
         source: payer,
         payload,
-        destinationChain: "a".repeat(20),
-        recipientOracle: `0x${"09".repeat(32)}`,
+        destinationChainId: (1n << 128n) - 1n,
+        recipientOracle: StrKey.encodeContract(Buffer.alloc(32, 9)),
+        destinationConfig: `0x${"09".repeat(32)}`,
         consume,
         deliveryMode,
         gasAmount: deliveryMode === "Relayed" ? 1n : 0n,

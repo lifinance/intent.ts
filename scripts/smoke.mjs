@@ -40,6 +40,8 @@ const entries = {
     "axelarApprovalSteps",
     "axelarReceiveSteps",
     "checkSolanaAxelarAdmission",
+    "axelarRouteChainAddress",
+    "checkAxelarChainName",
   ],
 };
 
