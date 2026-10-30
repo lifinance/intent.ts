@@ -101,8 +101,65 @@ account recipient tag (`context` ends in `0x00`). Stellar routes require the
 exclusivity identities for those orders are commitments, not padded EVM
 addresses.
 
-Current support is mainnet only. It covers G-account users and recipients,
-escrow orders with 1–4 inputs and outputs, and no same-chain Stellar orders.
+Builders support G-account users and recipients, escrow orders with 1–4 inputs
+and outputs, and no same-chain Stellar orders. Mainnet deployments remain the
+defaults. `STELLAR_TESTNET_CHAIN_ID` (`1201081091099711n`) has the testnet
+passphrase hash configured, but **no default deployment addresses**.
+
+Supply validated raw contract ids per `Intent` instance through `IntentDeps`:
+
+```ts
+import { STELLAR_TESTNET_CHAIN_ID, type IntentDeps } from "@lifi/intent";
+
+type StellarResolver = NonNullable<IntentDeps["getStellarDeployment"]>;
+// deployment is the validated public handoff, not credentials or predicted activation data.
+const getStellarDeployment: StellarResolver = (chainId) =>
+  chainId === STELLAR_TESTNET_CHAIN_ID
+    ? {
+        inputEscrow: stellarStrkeyToBytes32(deployment.stellar.inputEscrow),
+        outputSettler: stellarStrkeyToBytes32(deployment.stellar.outputSettler),
+      }
+    : undefined;
+```
+
+Pass `{ getOracle, getStellarDeployment }` as the constructor's dependencies.
+The same optional resolver is accepted as the second argument of
+`inputSettlerForStellar(chainId, resolver)` and
+`outputSettlerForStellar(chainId, resolver)`. Explicit values win, `undefined`
+falls back to the known mainnet defaults, and an unresolved testnet fails with
+`Unsupported Stellar chain id`. No exported registry is mutated. Keep oracle
+selection in `getOracle`; this resolver selects only the two settlers.
+
+`IntentApi.getQuotes` accepts `oracle: { chainId: number | bigint;
+namespace?: Namespace; address: string }[]`. Omitted namespaces remain `eip155`.
+Set `namespace: "stellar"` for Stellar filters, using a C-StrKey or raw bytes32
+contract id (converted to C-StrKey). G-account oracles and filters conflicting
+with a route's namespace are rejected before HTTP. Use `new IntentApi(false)`
+for the development API; explicitly allow both corridor oracle deployments.
+Stellar testnet USDC has 7 decimals, Base Sepolia USDC 6.
+
+`GetQuoteOptions` and `GetQuoteResponse` are exported. A selected quote can also
+be typed as `Awaited<ReturnType<IntentApi["getQuotes"]>>["quotes"][number]`.
+Keep the whole quote, including `quoteId`, optional `validUntil` (Unix seconds),
+`metadata.oracle`, `metadata.quoteReference`, allowances, and `openIntentTx`.
+The order type is `oif-user-open-v0`. Stellar `data` is base64 **order ScVal
+XDR**, not a signed envelope; it has no `gasRequired`. Decode and pass the exact
+ScVal to `open` on returned `to`, then simulate/sign on the selected network.
+EVM returns calldata, gas and optional native `value`; Solana and Tron retain
+their compute-unit and fee-limit fields. Do not reconstruct a nonce or re-encode
+API payloads from preview amounts. This SDK returns quote payloads unchanged.
+
+Order-status/list imports accept G/C-StrKeys as well as existing hex/base58.
+Stellar output recipient kinds remain bound to their context tag (`00` account,
+`01` contract); conflicting or missing tags fail instead of silently changing
+identity. Contract-account users are explicitly unsupported by the G-account
+order encoder. Hex claimant commitments remain opaque, never decoded as keys.
+
+Git dependencies run the normal `prepare` build to generate `_esm`, `_cjs` and
+`_types` exports (requires Bun and the package's development build dependencies).
+Consumers can pin the final SDK Git commit before a release; replacing that pin
+with an npm version requires a later release/tag publication. No new
+EVM/Stellar Axelar transport API or private-relay support is introduced here.
 
 ## Axelar (Solana)
 

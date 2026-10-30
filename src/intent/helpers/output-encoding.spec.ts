@@ -6,6 +6,7 @@ import {
   SOLANA_DEVNET_OUTPUT_SETTLER_PDA,
   SOLANA_MAINNET_CHAIN_ID,
   SOLANA_MAINNET_OUTPUT_SETTLER_PDA,
+  STELLAR_TESTNET_CHAIN_ID,
   TRON_MAINNET_CHAIN_ID,
   TRON_MAINNET_OUTPUT_SETTLER,
 } from "../../constants";
@@ -415,5 +416,48 @@ describe("output encoding helpers", () => {
 
     expect(first.oracle).toBe(addressToBytes32(tronInputOracle));
     expect(first.settler).toBe(addressToBytes32(COIN_FILLER));
+  });
+
+  it("uses the explicit Stellar output deployment and never borrows mainnet settlers", () => {
+    const settler = `0x${"12".repeat(32)}` as const;
+    const oracle = `0x${"34".repeat(32)}` as const;
+    const options = {
+      outputTokens: [
+        {
+          token: {
+            address: `0x${"56".repeat(32)}` as const,
+            name: "USDC",
+            chainId: STELLAR_TESTNET_CHAIN_ID,
+            decimals: 7,
+            chainNamespace: "stellar" as const,
+          },
+          amount: 10_000_000n,
+        },
+      ],
+      getOracle: () => oracle,
+      verifier: "axelar",
+      inputChainId: 84532n,
+      inputNamespace: "eip155" as const,
+      sameChain: false,
+      recipient: `0x${"78".repeat(32)}` as const,
+      currentTime: 1_700_000_000,
+    };
+    const [output] = buildMandateOutputs({
+      ...options,
+      getStellarDeployment: (chainId) =>
+        chainId === STELLAR_TESTNET_CHAIN_ID
+          ? { inputEscrow: `0x${"90".repeat(32)}`, outputSettler: settler }
+          : undefined,
+    });
+    expect(output).toMatchObject({
+      settler,
+      oracle,
+      chainId: STELLAR_TESTNET_CHAIN_ID,
+      amount: 10_000_000n,
+      context: "0x00",
+    });
+    expect(() => buildMandateOutputs(options)).toThrow(
+      `Unsupported Stellar chain id: ${STELLAR_TESTNET_CHAIN_ID}`,
+    );
   });
 });

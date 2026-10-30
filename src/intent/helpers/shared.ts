@@ -14,6 +14,7 @@ import {
   TRON_INPUT_SETTLER_PROGRAMS,
   TRON_OUTPUT_SETTLERS,
 } from "../../constants";
+import type { IntentDeps } from "../../deps";
 import type { CompactLock, EscrowLock } from "../../types";
 
 export const ONE_MINUTE = 60;
@@ -83,21 +84,31 @@ export function outputSettlerForTron(chainId: bigint): `0x${string}` {
   return settler;
 }
 
-/** Returns the raw InputEscrow contract id for the given Stellar chain ID. Throws for undeployed networks. */
-export function inputSettlerForStellar(chainId: bigint): `0x${string}` {
-  const settler = STELLAR_INPUT_ESCROWS[chainId.toString()];
+/** Returns the raw InputEscrow contract id; explicit deployments take priority over defaults. */
+export function inputSettlerForStellar(
+  chainId: bigint,
+  getStellarDeployment?: IntentDeps["getStellarDeployment"],
+): `0x${string}` {
+  const settler =
+    getStellarDeployment?.(chainId)?.inputEscrow ??
+    STELLAR_INPUT_ESCROWS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Stellar chain id: ${chainId}`);
   return settler;
 }
 
-/** Returns the raw OutputSettler contract id — the value `MandateOutput.settler` must hold. Throws for undeployed networks. */
-export function outputSettlerForStellar(chainId: bigint): `0x${string}` {
-  const settler = STELLAR_OUTPUT_SETTLERS[chainId.toString()];
+/** Returns the raw OutputSettler contract id; explicit deployments take priority over defaults. */
+export function outputSettlerForStellar(
+  chainId: bigint,
+  getStellarDeployment?: IntentDeps["getStellarDeployment"],
+): `0x${string}` {
+  const settler =
+    getStellarDeployment?.(chainId)?.outputSettler ??
+    STELLAR_OUTPUT_SETTLERS[chainId.toString()];
   if (!settler) throw new Error(`Unsupported Stellar chain id: ${chainId}`);
   return settler;
 }
 
-/** Returns the network id (sha256 of the passphrase) bound into Stellar order ids. Throws for undeployed networks. */
+/** Returns the network id (sha256 of the passphrase) bound into Stellar order ids. Throws for unknown networks. */
 export function networkIdForStellar(chainId: bigint): `0x${string}` {
   const networkId = STELLAR_NETWORK_IDS[chainId.toString()];
   if (!networkId) throw new Error(`Unsupported Stellar chain id: ${chainId}`);

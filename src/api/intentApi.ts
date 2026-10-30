@@ -20,6 +20,7 @@ import {
   bytes32ToStellarContract,
   isStellarAccount,
   isStellarContract,
+  stellarStrkeyToBytes32,
 } from "../helpers/stellar";
 
 type OrderStatus = "Signed" | "Delivered" | "Settled";
@@ -71,7 +72,7 @@ type GetOrderResponse = {
  * namespace must be set on any non-EVM input or output — it selects both the
  * CAIP-2 chain prefix and the address encoding, and they have to agree.
  */
-type GetQuoteOptions = {
+export type GetQuoteOptions = {
   user: string;
   userChainId: number | bigint;
   userNamespace?: Namespace;
@@ -92,8 +93,12 @@ type GetQuoteOptions = {
   swapType?: "exact-input" | "exact-output";
   minValidUntil?: number;
   exclusiveFor?: `0x${string}`[];
-  /** Accepted EVM oracle contracts on both sides of a cross-chain route. */
-  oracle?: { chainId: number | bigint; address: `0x${string}` }[];
+  /** Accepted oracle contracts, encoded in each chain's native namespace. */
+  oracle?: {
+    chainId: number | bigint;
+    namespace?: Namespace;
+    address: string;
+  }[];
   /**
    * Optional integrator key sent as the `X-Integrator-Key` header on the quote
    * request. Lets an integrator receive integrator-specific quotes.
@@ -116,22 +121,49 @@ type QuotePreviewItem = {
   amount: string;
 };
 
-type GetQuoteResponse = {
+export type GetQuoteResponse = {
   quotes: {
     quoteId: string;
     provider: string;
+    validUntil?: number;
     preview: {
       inputs: QuotePreviewItem[];
       outputs: QuotePreviewItem[];
     };
     order: {
-      type: string;
-      openIntentTx: {
-        chain: string;
-        to: string;
-        data: string;
-        gasRequired: string;
-      };
+      type: "oif-user-open-v0";
+      openIntentTx:
+        | {
+            chain: `stellar:${string}`;
+            to: string;
+            /** Base64 order ScVal XDR, not a signed transaction envelope. */
+            data: string;
+            gasRequired?: never;
+            value?: never;
+          }
+        | {
+            chain: `eip155:${string}`;
+            to: string;
+            data: string;
+            gasRequired: string;
+            value?: string;
+          }
+        | {
+            chain: `solana:${string}`;
+            to: string;
+            data: string;
+            computeUnitsRequired: string;
+            gasRequired?: never;
+            value?: never;
+          }
+        | {
+            chain: `tron:${string}`;
+            to: string;
+            data: string;
+            feeLimit: string;
+            gasRequired?: never;
+            value?: string;
+          };
       checks: {
         allowances: {
           chain: string;
@@ -146,8 +178,10 @@ type GetQuoteResponse = {
     failureHandling: string;
     metadata: {
       // Rendered in the INPUT chain's own form: `0x` hex on EVM, `T...` on
-      // Tron, base58 on Solana — not necessarily hex.
-      exclusiveFor: string | string[] | null;
+      // Tron, base58 on Solana, a commitment on Stellar — not necessarily hex.
+      exclusiveFor: string | null;
+      oracle: { input: string; output: string };
+      quoteReference: string;
     };
   }[];
 };
@@ -306,12 +340,15 @@ function toBigIntValue(value: unknown, field: string): bigint {
  * `inputSettler`, mints and recipients as raw base58. Left unconverted they
  * fail `toHexString` and the import dies on the first such field.
  *
- * The two encodings cannot collide: base58's alphabet excludes `0`, so no
- * base58 address can begin with `0x`. Hex is passed through byte-for-byte,
- * which leaves EVM and Tron orders parsed exactly as before.
+ * Valid Stellar strkeys must be recognized before Solana base58. The internal
+ * representation keeps their raw keys; Stellar recipient kinds remain in the
+ * output context. Hex (including claimant commitments) passes through unchanged.
  */
 function toAddress(value: unknown, field: string): `0x${string}` {
   if (typeof value === "string" && !value.startsWith("0x")) {
+    const address = value.trim();
+    if (isStellarAccount(address) || isStellarContract(address))
+      return stellarStrkeyToBytes32(address);
     try {
       return solanaBase58ToBytes32(value.trim());
     } catch {
@@ -339,6 +376,12 @@ function toAssetId(value: unknown, field: string): bigint {
     return BigInt(toAddress(value, field));
   }
   return toBigIntValue(value, field);
+}
+
+function toOrderUser(value: unknown): `0x${string}` {
+  if (typeof value === "string" && isStellarContract(value.trim()))
+    throw new Error("Order payload invalid: contract users are not supported");
+  return toAddress(value, "order.user");
 }
 
 function toNumberValue(value: unknown, field: string): number {
@@ -369,6 +412,17 @@ function normalizeOutputs(value: unknown) {
       throw new Error(`Order payload invalid: outputs[${index}]`);
     }
     const o = output as Record<string, unknown>;
+    const context = toHexString(o.context ?? "0x", `outputs[${index}].context`);
+    if (
+      typeof o.recipient === "string" &&
+      (isStellarAccount(o.recipient) || isStellarContract(o.recipient))
+    ) {
+      const tag = isStellarContract(o.recipient) ? "01" : "00";
+      if (context === "0x" || context.slice(-2) !== tag)
+        throw new Error(
+          `Order payload invalid: outputs[${index}].recipient kind does not match context`,
+        );
+    }
     return {
       oracle: toAddress(o.oracle, `outputs[${index}].oracle`),
       settler: toAddress(o.settler, `outputs[${index}].settler`),
@@ -380,7 +434,7 @@ function normalizeOutputs(value: unknown) {
         o.callbackData ?? "0x",
         `outputs[${index}].callbackData`,
       ),
-      context: toHexString(o.context ?? "0x", `outputs[${index}].context`),
+      context,
     };
   });
 }
@@ -389,7 +443,9 @@ function normalizeStandardOrder(order: Record<string, unknown>): StandardOrder {
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toAddress(order.user, "order.user"),
+    // The Stellar encoder supports G-account users, not contract accounts.
+    // Reject rather than silently re-encoding a C-address as an ed25519 key.
+    user: toOrderUser(order.user),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     originChainId: toBigIntValue(order.originChainId, "order.originChainId"),
     expires: toNumberValue(order.expires, "order.expires"),
@@ -414,7 +470,7 @@ function normalizeMultichainOrder(
   if (!Array.isArray(order.inputs))
     throw new Error("Order payload invalid: inputs");
   return {
-    user: toAddress(order.user, "order.user"),
+    user: toOrderUser(order.user),
     nonce: toBigIntValue(order.nonce, "order.nonce"),
     expires: toNumberValue(order.expires, "order.expires"),
     fillDeadline: toNumberValue(order.fillDeadline, "order.fillDeadline"),
@@ -634,28 +690,49 @@ export class IntentApi {
       );
     }
     if (oracle !== undefined) {
-      metadata.oracle = oracle.map(({ chainId, address }) => {
-        if (
-          (typeof chainId === "number" && !Number.isSafeInteger(chainId)) ||
-          chainId <= 0
-        ) {
-          throw new Error("Oracle chain ID must be a positive EVM integer");
-        }
-        if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
-          throw new Error("Oracle contract must be a 20-byte EVM address");
-        }
-        if (
-          [...inputs, ...outputs].some(
-            (item) =>
-              BigInt(item.chainId) === BigInt(chainId) &&
-              item.namespace !== undefined &&
-              item.namespace !== "eip155",
-          )
-        ) {
-          throw new Error("Oracle filters support EVM chains only");
-        }
-        return { chain: toCaip2Chain(chainId, "eip155"), address };
-      });
+      metadata.oracle = oracle.map(
+        ({ chainId, namespace = "eip155", address }) => {
+          if (
+            (typeof chainId === "number" && !Number.isSafeInteger(chainId)) ||
+            chainId <= 0
+          ) {
+            throw new Error("Oracle chain ID must be a positive safe integer");
+          }
+          if (
+            [...inputs, ...outputs].some(
+              (item) =>
+                BigInt(item.chainId) === BigInt(chainId) &&
+                (item.namespace ?? "eip155") !== namespace,
+            )
+          ) {
+            throw new Error(
+              "Oracle namespace conflicts with route chain namespace",
+            );
+          }
+          let nativeAddress: string;
+          if (namespace === "stellar") {
+            if (isStellarContract(address)) nativeAddress = address;
+            else if (/^0x[0-9a-fA-F]{64}$/.test(address))
+              nativeAddress = bytes32ToStellarContract(
+                address as `0x${string}`,
+              );
+            else
+              throw new Error(
+                "Oracle contract must be a Stellar C-address or 32-byte contract ID",
+              );
+          } else if (namespace === "solana") {
+            nativeAddress = toQuoteAddress(address, "asset", namespace);
+          } else {
+            if (!/^0x[0-9a-fA-F]{40}$/.test(address))
+              throw new Error("Oracle contract must be a 20-byte EVM address");
+            nativeAddress = address;
+          }
+          return {
+            chain: toCaip2Chain(chainId, namespace),
+            address: nativeAddress,
+          };
+        },
+      );
     }
     if (Object.keys(metadata).length > 0) intent.metadata = metadata;
 
@@ -763,35 +840,6 @@ export class IntentApi {
    */
   async getAndParseOrders(): Promise<OrderContainer[]> {
     const response = await this.getOrders();
-    return response.data.map((instance) => {
-      const order: StandardOrder = {
-        ...instance.order,
-        nonce: BigInt(instance.order.nonce),
-        originChainId: BigInt(instance.order.originChainId),
-        inputs: instance.order.inputs.map(([tokenId, amount]) => [
-          BigInt(tokenId),
-          BigInt(amount),
-        ]),
-        outputs: instance.order.outputs.map((output) => ({
-          ...output,
-          chainId: BigInt(output.chainId),
-          amount: BigInt(output.amount),
-        })),
-      };
-      const allocatorSignature: Signature | NoSignature =
-        instance.allocatorSignature
-          ? { type: "ECDSA", payload: instance.allocatorSignature }
-          : { type: "None", payload: "0x" };
-      const sponsorSignature: Signature | NoSignature =
-        instance.sponsorSignature
-          ? { type: "ECDSA", payload: instance.sponsorSignature }
-          : { type: "None", payload: "0x" };
-      return {
-        inputSettler: instance.inputSettler,
-        order,
-        sponsorSignature,
-        allocatorSignature,
-      };
-    });
+    return response.data.map((instance) => parseOrderStatusPayload(instance));
   }
 }
