@@ -45,6 +45,10 @@ export default {
   ],
   plugins: [
     esbuild({
+      // Bun prepares Git dependencies inside node_modules. Match only this
+      // package's sources instead of excluding every node_modules ancestor.
+      include: "src/**/*.{js,jsx,ts,tsx}",
+      exclude: "src/**/node_modules/**",
       // Keep in sync with `target` in tsconfig.base.json. esbuild does NOT read
       // `target` from a tsconfig (esbuild's `tsconfigRaw` only honours a subset
       // of options, and `target` is not among them), so it must be set here

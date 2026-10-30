@@ -157,6 +157,11 @@ order encoder. Hex claimant commitments remain opaque, never decoded as keys.
 
 Git dependencies run the normal `prepare` build to generate `_esm`, `_cjs` and
 `_types` exports (requires Bun and the package's development build dependencies).
+Bun consumers must allow this package's lifecycle explicitly with
+`"trustedDependencies": ["@lifi/intent"]` in their package manifest; merge that
+entry with any existing audited trust list, not a blanket allow-all. The build
+also supports Bun's in-place Git preparation under `node_modules`, while
+transforming only this package's `src` tree.
 Consumers can pin the final SDK Git commit before a release; replacing that pin
 with an npm version requires a later release/tag publication. No new
 EVM/Stellar Axelar transport API or private-relay support is introduced here.
