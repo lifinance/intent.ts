@@ -4,6 +4,7 @@ import {
   axelarConfigAddress,
   axelarInitializeInstruction,
   axelarSetChainMappingInstruction,
+  checkAxelarChainName,
   type AxelarInstruction,
 } from "../../../src/axelar/index";
 
@@ -11,7 +12,6 @@ import {
 export type ChainRoute = {
   name: string;
   chainId: string | number;
-  kind: string;
 };
 export type DeploymentManifest = {
   platform: string;
@@ -35,9 +35,6 @@ export type Deployment = {
   finalization: string[];
 };
 
-// Axelar ChainNameRaw: at most 20 bytes. Mappings use the lowercase form.
-const CHAIN_NAME = /^[a-z0-9-]{1,20}$/;
-
 function uint128(value: string | number): bigint {
   if (typeof value === "number" && !Number.isSafeInteger(value))
     throw new Error("Use decimal strings for large chain IDs");
@@ -55,19 +52,12 @@ export function chainMapping(
   owner: string,
 ): AxelarInstruction {
   new PublicKey(owner);
-  if (
-    typeof route.name !== "string" ||
-    !CHAIN_NAME.test(route.name) ||
-    (route.kind !== "evm" &&
-      route.kind !== "stellar" &&
-      route.kind !== "solana")
-  )
+  if (typeof route.name !== "string")
     throw new Error("Invalid Axelar chain mapping");
   return axelarSetChainMappingInstruction({
     owner,
     name: route.name,
     chainId: uint128(route.chainId),
-    kind: route.kind,
   });
 }
 
@@ -97,19 +87,17 @@ export function deployment(
   )
     throw new Error("Invalid owner");
   new PublicKey(m.owner);
-  if (typeof m.chainName !== "string" || !CHAIN_NAME.test(m.chainName))
+  if (typeof m.chainName !== "string")
     throw new Error("Invalid local chain name");
+  checkAxelarChainName(m.chainName);
   const local = uint128(m.chainId);
   if (!Array.isArray(m.routes)) throw new Error("Expected route list");
   const ids = new Set([local]),
     names = new Set([m.chainName]);
   for (const r of m.routes) {
-    if (
-      typeof r.name !== "string" ||
-      !CHAIN_NAME.test(r.name) ||
-      names.has(r.name) ||
-      ids.has(uint128(r.chainId))
-    )
+    if (typeof r.name !== "string") throw new Error("Invalid route");
+    checkAxelarChainName(r.name);
+    if (names.has(r.name) || ids.has(uint128(r.chainId)))
       throw new Error("Invalid or duplicate route");
     ids.add(uint128(r.chainId));
     names.add(r.name);

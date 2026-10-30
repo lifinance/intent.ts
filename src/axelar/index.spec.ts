@@ -4,7 +4,6 @@ import { keccak256 } from "viem";
 import vectors from "../../tests/vectors/axelarClientVectors.json";
 import { toBytes, u128Le } from "./bytes";
 import {
-  type AxelarAddressKind,
   type AxelarMessage,
   INTENTS_PROTOCOL_PROGRAM,
   axelarApprovalSteps,
@@ -42,7 +41,6 @@ function run(r: Request): unknown {
         owner: r.payer,
         name: r.name,
         chainId: BigInt(r.chainId),
-        kind: r.kind,
       });
     case "initialize":
       return axelarInitializeInstruction({
@@ -72,8 +70,8 @@ function run(r: Request): unknown {
         gateway: r.gateway,
         gasService: r.gasService,
         source: r.source,
-        destinationChain: r.destinationChain,
-        recipientOracle: hex(r.recipientOracle),
+        destinationChainId: BigInt(r.destinationChainId),
+        recipientOracle: r.recipientOracle,
         payload: hex(r.payload),
         gasAmount: BigInt(r.gasAmount),
         destinationConfig: r.destinationConfig && hex(r.destinationConfig),
@@ -94,7 +92,6 @@ function run(r: Request): unknown {
         message,
         payload: hex(r.payload),
         sourceChainId: BigInt(r.sourceChainId),
-        sourceKind: r.sourceKind as AxelarAddressKind,
       });
   }
   throw new Error(`Unknown operation ${r.operation}`);
@@ -126,7 +123,9 @@ const REJECTIONS: Record<string, RegExp> = {
   "reject receive message bounds":
     /^Axelar message field outside gateway bounds$/,
   "reject receive zero chain": /^Source chain ID must be a nonzero u128$/,
-  "reject receive sender kind": /^Invalid Stellar contract address$/,
+  "reject malformed sender": /^Invalid EVM address$/,
+  "reject zero destination chain id":
+    /^Axelar destination chain ID must be a nonzero u128$/,
 };
 
 type Vector = {
@@ -150,7 +149,7 @@ describe("Axelar builders match the Rust reference vectors", () => {
 });
 
 describe("axelarReceiveSteps", () => {
-  it("derives a Solana-kind sender from the base58 source address", () => {
+  it("derives a Solana sender from the base58 source address", () => {
     const r = (vectors as Vector[]).find(
       (v) => v.name === "receive from evm",
     )!.request;
@@ -162,7 +161,6 @@ describe("axelarReceiveSteps", () => {
       message,
       payload: `0x${r.payload}`,
       sourceChainId: 77n,
-      sourceKind: "solana",
     });
     // Envelope: u8 tag, u32-LE length, OIF message = application(32) ||
     // u16-BE count || u16-BE size || proof.
@@ -174,7 +172,7 @@ describe("axelarReceiveSteps", () => {
         new TextEncoder().encode("attestation"),
         base58.decode(plan.config),
         u128Le(77n),
-        decodeAxelarAddress(source, "solana"),
+        decodeAxelarAddress(source),
         oif.subarray(0, 32),
         keccak256(oif.subarray(36, 36 + size), "bytes"),
       ],
@@ -189,7 +187,6 @@ describe("axelarReceiveSteps", () => {
         message: { ...message, source_address: `${source}1` },
         payload: `0x${r.payload}`,
         sourceChainId: 77n,
-        sourceKind: "solana",
       }),
     ).toThrow(/^Invalid Solana address/);
   });
@@ -208,8 +205,8 @@ describe("axelarSubmitInstruction payload commitment", () => {
       gateway: r.gateway,
       gasService: r.gasService,
       source: r.source,
-      destinationChain: r.destinationChain,
-      recipientOracle: `0x${r.recipientOracle}`,
+      destinationChainId: BigInt(r.destinationChainId),
+      recipientOracle: r.recipientOracle,
       payload,
       gasAmount: 0n,
       destinationConfig: r.destinationConfig && `0x${r.destinationConfig}`,

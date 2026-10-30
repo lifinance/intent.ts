@@ -112,11 +112,15 @@ pinned Axelar 1.1.1 gateway and gas service. It never loads keys, contacts RPC
 or broadcasts. Instructions are `{ programId, keys, data }` with base58 keys and
 `0x` hex data.
 
-- Deployment: `axelarInitializeInstruction`, `axelarSetChainMappingInstruction`,
-  `axelarConfigAddress`, `axelarRouteAddress`, `decodeAxelarConfig`,
+- Deployment: `axelarInitializeInstruction`, `axelarSetChainMappingInstruction`
+  (names follow `checkAxelarChainName`: 1–20 ASCII bytes, no NUL, `_` or ASCII uppercase),
+  `axelarConfigAddress`, `axelarRouteAddress` (by name),
+  `axelarRouteChainAddress` (by chain ID), `decodeAxelarConfig`,
   `decodeAxelarRoute`.
-- Source: `axelarSubmitInstruction` (`Relayed` with positive gas or `SelfRelay`
-  with zero; `consume` selects `submit_consume`), `axelarFundInstruction`.
+- Source: `axelarSubmitInstruction` by destination chain ID and verbatim
+  recipient string (`Relayed` with positive gas or `SelfRelay` with zero; a
+  nonzero `destinationConfig` selects the Solana executable envelope; `consume`
+  selects `submit_consume`), `axelarFundInstruction`.
 - Destination: `axelarApprovalSteps` turns prover `execute_data` into gateway
   session, signature and approval transactions, refusing any approval other
   than the expected single message; `axelarReceiveSteps` returns `execute` and
