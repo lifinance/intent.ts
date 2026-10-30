@@ -162,6 +162,15 @@ Bun consumers must allow this package's lifecycle explicitly with
 entry with any existing audited trust list, not a blanket allow-all. The build
 also supports Bun's in-place Git preparation under `node_modules`, while
 transforming only this package's `src` tree.
+Bun 1.4.2 does not install a Git dependency's own devDependencies for this
+in-place build. Bun Git consumers must therefore declare these build tools in
+their own devDependencies: `rollup: "^4.61.0"`,
+`rollup-plugin-esbuild: "^6.2.1"`, `typescript: "^5.6.3"`, and
+`@types/bun: "^1.3.8"` (keep compatible existing entries). Install with dev
+dependencies enabled. No additional lifecycle trust was needed for those
+tools in the verified install; esbuild's optional platform binary worked with
+its postinstall still blocked. npm Git installation prepares in its temporary
+checkout with the SDK's devDependencies and needs no consumer build-tool entries.
 Consumers can pin the final SDK Git commit before a release; replacing that pin
 with an npm version requires a later release/tag publication. No new
 EVM/Stellar Axelar transport API or private-relay support is introduced here.
