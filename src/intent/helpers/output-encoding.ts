@@ -81,6 +81,7 @@ export function buildMandateOutputs(options: {
   exclusiveFor?: `0x${string}`;
   outputTokens: TokenContext[];
   getOracle: IntentDeps["getOracle"];
+  getStellarDeployment?: IntentDeps["getStellarDeployment"];
   verifier: CoreVerifier;
   inputChainId: bigint;
   inputNamespace: Namespace;
@@ -94,6 +95,7 @@ export function buildMandateOutputs(options: {
     exclusiveFor,
     outputTokens,
     getOracle,
+    getStellarDeployment,
     verifier,
     inputChainId,
     inputNamespace,
@@ -122,7 +124,10 @@ export function buildMandateOutputs(options: {
     } else if (token.chainNamespace === "tron") {
       outputSettler = outputSettlerForTron(token.chainId);
     } else if (token.chainNamespace === "stellar") {
-      outputSettler = outputSettlerForStellar(token.chainId);
+      outputSettler = outputSettlerForStellar(
+        token.chainId,
+        getStellarDeployment,
+      );
     } else {
       outputSettler = COIN_FILLER;
     }

@@ -1,9 +1,18 @@
 import { describe, expect, it } from "bun:test";
-import { bytesToHex } from "viem";
+import { bytesToHex, sha256, toBytes } from "viem";
 import fixture from "../../../tests/vectors/stellarClientOrder.json";
 import { stellarStrkeyToBytes32 } from "../../helpers/stellar";
 import type { StandardStellar } from "../../types";
-import { STELLAR_MAINNET_CHAIN_ID } from "../../constants";
+import {
+  STELLAR_MAINNET_CHAIN_ID,
+  STELLAR_TESTNET_CHAIN_ID,
+} from "../../constants";
+import { Intent } from "../create";
+import {
+  inputSettlerForStellar,
+  outputSettlerForStellar,
+} from "../helpers/shared";
+import type { CoreToken, IntentDeps } from "../../index";
 import { orderToIntent } from "../fromOrder";
 import {
   StandardStellarIntent,
@@ -99,6 +108,28 @@ describe("Stellar order encoding", () => {
     );
   });
 
+  it("binds testnet order ids to the testnet passphrase", () => {
+    const escrow = stellarStrkeyToBytes32(fixture.escrow);
+    const order = {
+      ...fixtureOrder(),
+      originChainId: STELLAR_TESTNET_CHAIN_ID,
+    };
+    expect(computeStandardStellarId(escrow, order)).toBe(
+      stellarOrderId(
+        sha256(toBytes("Test SDF Network ; September 2015")),
+        escrow,
+        order,
+      ),
+    );
+    expect(computeStandardStellarId(escrow, order)).not.toBe(
+      stellarOrderId(
+        sha256(toBytes("Public Global Stellar Network ; September 2015")),
+        escrow,
+        order,
+      ),
+    );
+  });
+
   it("rejects orders the escrow would reject", () => {
     const order = fixtureOrder();
     expect(() => encodeStellarOrder({ ...order, inputs: [] })).toThrow(
@@ -168,5 +199,75 @@ describe("orderToIntent", () => {
     expect(intent).toBeInstanceOf(StandardStellarIntent);
     expect(intent.inputChains()).toEqual([STELLAR_MAINNET_CHAIN_ID]);
     expect(intent.orderId()).toBe(computeStandardStellarId(escrow, order));
+  });
+});
+
+describe("explicit Stellar deployments", () => {
+  // Synthetic contract ids, not deployment records.
+  const inputEscrow = `0x${"12".repeat(32)}` as const;
+  const outputSettler = `0x${"34".repeat(32)}` as const;
+  const stellarToken: CoreToken = {
+    address: word("02"),
+    name: "USDC",
+    chainId: STELLAR_TESTNET_CHAIN_ID,
+    decimals: 7,
+    chainNamespace: "stellar",
+  };
+  const evmToken: CoreToken = {
+    address: "0x1111111111111111111111111111111111111111",
+    name: "USDC",
+    chainId: 84532n,
+    decimals: 6,
+    chainNamespace: "eip155",
+  };
+  const deps: IntentDeps = {
+    getOracle: (_, chainId) =>
+      chainId === STELLAR_TESTNET_CHAIN_ID ? word("03") : evmToken.address,
+    getStellarDeployment: (chainId) =>
+      chainId === STELLAR_TESTNET_CHAIN_ID
+        ? { inputEscrow, outputSettler }
+        : undefined,
+  };
+  const options = {
+    account: fixtureOrder().user,
+    inputTokens: [{ token: stellarToken, amount: 10_000_000n }],
+    outputTokens: [{ token: evmToken, amount: 1_000_000n }],
+    outputRecipient: evmToken.address,
+    lock: { type: "escrow" as const },
+    verifier: "axelar",
+  };
+
+  it("uses the instance deployment for Stellar issuance and fails closed without one", () => {
+    const intent = new Intent(options, deps).singlechain();
+    expect(intent.inputSettler).toBe(inputEscrow);
+    expect(intent.asOrder().inputs).toEqual([
+      [BigInt(stellarToken.address), 10_000_000n],
+    ]);
+    expect(intent.asOrder().outputs[0]!.amount).toBe(1_000_000n);
+    expect(intent.orderId()).toBe(
+      computeStandardStellarId(inputEscrow, intent.asOrder()),
+    );
+    expect(() =>
+      new Intent(options, { getOracle: deps.getOracle }).singlechain(),
+    ).toThrow(`Unsupported Stellar chain id: ${STELLAR_TESTNET_CHAIN_ID}`);
+  });
+
+  it("overrides mainnet defaults locally without mutating them", () => {
+    const defaultInput = inputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID);
+    const defaultOutput = outputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID);
+    const resolve = () => ({ inputEscrow, outputSettler });
+    expect(inputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID, resolve)).toBe(
+      inputEscrow,
+    );
+    expect(outputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID, resolve)).toBe(
+      outputSettler,
+    );
+    expect(inputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID)).toBe(defaultInput);
+    expect(outputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID)).toBe(
+      defaultOutput,
+    );
+    expect(
+      inputSettlerForStellar(STELLAR_MAINNET_CHAIN_ID, () => undefined),
+    ).toBe(defaultInput);
   });
 });

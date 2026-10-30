@@ -234,12 +234,18 @@ export const TRON_LEGACY_POLYMER_ORACLES: Record<
 /** OIF chain id of Stellar mainnet (intent-soroban deployment). */
 export const STELLAR_MAINNET_CHAIN_ID = 1201081091099710n;
 
+/** OIF chain id of Stellar testnet. Deployment addresses must be supplied explicitly. */
+export const STELLAR_TESTNET_CHAIN_ID = 1201081091099711n;
+
 // Stellar mainnet deployment (contracts/DEPLOYMENTS.md), as raw 32-byte
 // contract ids. Do NOT use these directly — go through
 // inputSettlerForStellar / outputSettlerForStellar / networkIdForStellar.
 // sha256("Public Global Stellar Network ; September 2015")
 const STELLAR_MAINNET_NETWORK_ID =
   "0x7ac33997544e3175d266bd022439b22cdb16508c01163f26e5cb2a3e1045a979" as const;
+// sha256("Test SDF Network ; September 2015")
+const STELLAR_TESTNET_NETWORK_ID =
+  "0xcee0302d59844d32bdca915c8203dd44b33fbb7edc19051ea37abedf28ecd472" as const;
 // InputEscrow: CA5GTK5U5LYGWIJSAG6LD724NUDFONHVEHYOHOH5KWCKCX5I442QYLUN
 const STELLAR_MAINNET_INPUT_ESCROW =
   "0x3a69abb4eaf06b213201bcb1ff5c6d065734f521f0e3b8fd5584a15fa8e7350c" as const;
@@ -249,6 +255,7 @@ const STELLAR_MAINNET_OUTPUT_SETTLER =
 
 export const STELLAR_NETWORK_IDS: Record<string, `0x${string}` | undefined> = {
   [STELLAR_MAINNET_CHAIN_ID.toString()]: STELLAR_MAINNET_NETWORK_ID,
+  [STELLAR_TESTNET_CHAIN_ID.toString()]: STELLAR_TESTNET_NETWORK_ID,
 };
 
 export const STELLAR_INPUT_ESCROWS: Record<string, `0x${string}` | undefined> =
