@@ -14,25 +14,19 @@ export type AxelarMessage = {
 };
 
 /**
- * Longest admitted Axelar chain name in UTF-8 bytes: the EVM `AxelarStrings`
- * limit and the Solana program's `MAX_CHAIN_NAME` (Axelar currently caps names at 20).
+ * Longest inbound Axelar chain name in bytes: the EVM `AxelarStrings` lookup bound
+ * and the Solana program's `MAX_CHAIN_NAME`.
  */
 export const AXELAR_MAX_CHAIN_NAME = 32;
 
 /**
- * Owner chain-map name rule shared with EVM `AxelarOracle.setChainMap`: 1-32 UTF-8
- * bytes, no NUL and no ASCII uppercase (the lowercased lookup key of itself).
+ * Owner chain-map name rule shared with EVM `AxelarOracle.setChainMap`: an Axelar
+ * `ChainNameRaw` in lowercase form, 1-20 ASCII bytes without NUL, `_` or ASCII uppercase.
  */
 export function checkAxelarChainName(name: string): void {
-  const length = utf8.encode(name).length;
-  if (
-    length === 0 ||
-    length > AXELAR_MAX_CHAIN_NAME ||
-    name.includes("\0") ||
-    /[A-Z]/.test(name)
-  )
+  if (!/^[\x01-\x7f]{1,20}$/.test(name) || /[A-Z_]/.test(name))
     throw new Error(
-      "Axelar chain name must be 1-32 bytes without NUL or ASCII uppercase",
+      "Axelar chain name must be 1-20 ASCII bytes without NUL, _ or ASCII uppercase",
     );
 }
 

@@ -183,6 +183,7 @@ export function axelarInitializeInstruction(a: {
   gasService: string;
   chainName: string;
 }): AxelarInstruction {
+  checkAxelarChainName(a.chainName);
   const program = AXELAR_ORACLE_PROGRAM;
   return instruction(
     program,

@@ -113,7 +113,7 @@ or broadcasts. Instructions are `{ programId, keys, data }` with base58 keys and
 `0x` hex data.
 
 - Deployment: `axelarInitializeInstruction`, `axelarSetChainMappingInstruction`
-  (names follow `checkAxelarChainName`: 1–32 bytes, no NUL, no ASCII uppercase),
+  (names follow `checkAxelarChainName`: 1–20 ASCII bytes, no NUL, `_` or ASCII uppercase),
   `axelarConfigAddress`, `axelarRouteAddress` (by name),
   `axelarRouteChainAddress` (by chain ID), `decodeAxelarConfig`,
   `decodeAxelarRoute`.

@@ -81,17 +81,19 @@ describe("EVM AxelarStrings reference vectors", () => {
   });
 
   it("admits owner chain-map names", () => {
+    for (const name of ["ethereum", "0123456789-.:/ !~", "a".repeat(20)])
+      expect(() => checkAxelarChainName(name)).not.toThrow();
     for (const name of [
-      "ethereum",
-      "0123456789-_.:/ !~",
-      "a".repeat(32),
+      "Ethereum",
+      "",
+      "a".repeat(21),
+      "ba\0se",
       "x\u{e9}",
       "st_ellar",
+      "_",
     ])
-      expect(() => checkAxelarChainName(name)).not.toThrow();
-    for (const name of ["Ethereum", "", "a".repeat(33), "ba\0se"])
       expect(() => checkAxelarChainName(name)).toThrow(
-        /^Axelar chain name must be 1-32 bytes without NUL or ASCII uppercase$/,
+        /^Axelar chain name must be 1-20 ASCII bytes without NUL, _ or ASCII uppercase$/,
       );
   });
 });
