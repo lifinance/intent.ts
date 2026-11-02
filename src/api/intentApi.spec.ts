@@ -8,6 +8,13 @@ import {
   bytes32ToSolanaBase58,
   solanaBase58ToBytes32,
 } from "../helpers/solana";
+import {
+  bytes32ToStellarAccount,
+  bytes32ToStellarContract,
+  stellarAddressCommitment,
+  stellarStrkeyToBytes32,
+} from "../helpers/stellar";
+import { computeStandardStellarId } from "../intent/stellar/standard.stellar";
 import { IntentApi, parseOrderStatusPayload } from "./intentApi";
 
 const BYTES32_ONE =
@@ -196,6 +203,100 @@ describe("parseOrderStatusPayload", () => {
     const input = parsed.order.inputs[0];
     if (!input) throw new Error("Expected an input");
     expect(input[0]).toBe(123n);
+  });
+
+  it("imports Stellar strkeys without changing order identity or recipient kind", () => {
+    const key = `0x${"12".repeat(32)}` as const;
+    const contract = bytes32ToStellarContract(key);
+    const account = bytes32ToStellarAccount(key);
+    const commitment = stellarAddressCommitment(account);
+    const rawOrder = {
+      user: key,
+      nonce: 123n,
+      originChainId: STELLAR_MAINNET_CHAIN_ID,
+      expires: 2_000_000_000,
+      fillDeadline: 1_999_999_900,
+      inputOracle: key,
+      inputs: [[BigInt(key), 10_000_000n]] as [bigint, bigint][],
+      outputs: [
+        {
+          oracle: key,
+          settler: key,
+          chainId: STELLAR_MAINNET_CHAIN_ID,
+          token: key,
+          amount: 10_000_000n,
+          recipient: key,
+          callbackData: "0x" as const,
+          context: "0x01" as const,
+        },
+      ],
+    };
+    for (const [recipient, context] of [
+      [account, "0x00"],
+      [contract, "0x01"],
+    ] as const) {
+      const payload = {
+        inputSettler: contract,
+        order: {
+          ...rawOrder,
+          user: account,
+          inputOracle: contract,
+          inputs: [[contract, "10000000"]],
+          outputs: [
+            {
+              ...rawOrder.outputs[0],
+              oracle: contract,
+              settler: contract,
+              token: contract,
+              recipient,
+              context,
+            },
+          ],
+        },
+      };
+      const parsed = parseOrderStatusPayload(payload);
+      if (!isStandardOrder(parsed.order))
+        throw new Error("Expected standard order");
+      expect(parsed.inputSettler).toBe(stellarStrkeyToBytes32(contract));
+      expect(parsed.order).toEqual({
+        ...rawOrder,
+        outputs: [{ ...rawOrder.outputs[0]!, context }],
+      });
+      expect(computeStandardStellarId(parsed.inputSettler, parsed.order)).toBe(
+        computeStandardStellarId(key, {
+          ...rawOrder,
+          outputs: [{ ...rawOrder.outputs[0]!, context }],
+        }),
+      );
+      expect(() =>
+        parseOrderStatusPayload({
+          ...payload,
+          order: {
+            ...payload.order,
+            outputs: [
+              {
+                ...payload.order.outputs[0],
+                context: context === "0x01" ? "0x00" : "0x01",
+              },
+            ],
+          },
+        }),
+      ).toThrow("recipient kind");
+    }
+    const parsedCommitment = parseOrderStatusPayload({
+      inputSettler: contract,
+      order: {
+        ...rawOrder,
+        outputs: [{ ...rawOrder.outputs[0], recipient: commitment }],
+      },
+    });
+    expect(parsedCommitment.order.outputs[0]!.recipient).toBe(commitment);
+    expect(() =>
+      parseOrderStatusPayload({
+        inputSettler: contract,
+        order: { ...rawOrder, user: contract },
+      }),
+    ).toThrow("contract users are not supported");
   });
 
   it("throws for invalid payload", () => {

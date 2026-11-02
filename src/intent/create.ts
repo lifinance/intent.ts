@@ -39,6 +39,7 @@ export class Intent {
   private inputs: TokenContext[];
   private outputs: TokenContext[];
   private getOracle: IntentDeps["getOracle"];
+  private getStellarDeployment: IntentDeps["getStellarDeployment"];
   private verifier: string;
   private exclusiveFor?: `0x${string}`;
   private outputRecipient?: `0x${string}`;
@@ -58,6 +59,7 @@ export class Intent {
     this.outputs = opts.outputTokens;
     this.verifier = opts.verifier;
     this.getOracle = deps.getOracle;
+    this.getStellarDeployment = deps.getStellarDeployment;
     this.exclusiveFor = opts.exclusiveFor;
     this.outputRecipient = opts.outputRecipient;
     if (opts.expiry !== undefined) this.expiry = opts.expiry;
@@ -204,6 +206,7 @@ export class Intent {
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
             getOracle: this.getOracle,
+            getStellarDeployment: this.getStellarDeployment,
             verifier: this.verifier,
             inputChainId: inputChain,
             inputNamespace,
@@ -248,6 +251,7 @@ export class Intent {
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
             getOracle: this.getOracle,
+            getStellarDeployment: this.getStellarDeployment,
             verifier: this.verifier,
             inputChainId: inputChain,
             inputNamespace,
@@ -301,6 +305,7 @@ export class Intent {
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
             getOracle: this.getOracle,
+            getStellarDeployment: this.getStellarDeployment,
             verifier: this.verifier,
             inputChainId: inputChain,
             inputNamespace,
@@ -311,7 +316,7 @@ export class Intent {
           }),
         };
         return new StandardStellarIntent(
-          inputSettlerForStellar(inputChain),
+          inputSettlerForStellar(inputChain, this.getStellarDeployment),
           stellarOrder,
         );
       }
@@ -354,6 +359,7 @@ export class Intent {
             exclusiveFor: this.exclusiveFor,
             outputTokens: this.outputs,
             getOracle: this.getOracle,
+            getStellarDeployment: this.getStellarDeployment,
             verifier: this.verifier,
             inputChainId: inputChain,
             inputNamespace,
@@ -425,6 +431,7 @@ export class Intent {
         exclusiveFor: this.exclusiveFor,
         outputTokens: this.outputs,
         getOracle: this.getOracle,
+        getStellarDeployment: this.getStellarDeployment,
         verifier: this.verifier,
         inputChainId: firstInput.token.chainId,
         // Multichain orders are EVM-only: a Solana or Tron input is rejected

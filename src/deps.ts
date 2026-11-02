@@ -5,6 +5,10 @@ export type IntentDeps = {
     verifier: CoreVerifier,
     chainId: bigint,
   ) => `0x${string}` | undefined;
+  /** Explicit raw Stellar contract ids override known-network defaults. */
+  getStellarDeployment?: (
+    chainId: bigint,
+  ) => { inputEscrow: `0x${string}`; outputSettler: `0x${string}` } | undefined;
 };
 
 export type StandardOrderValidationDeps = {

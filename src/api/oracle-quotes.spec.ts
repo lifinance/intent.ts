@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { IntentApi } from "./intentApi";
+import { STELLAR_TESTNET_CHAIN_ID } from "../constants";
+import {
+  bytes32ToStellarAccount,
+  bytes32ToStellarContract,
+} from "../helpers/stellar";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -58,7 +63,7 @@ describe("EVM oracle quote filters", () => {
     expect(bodies[1].intent.metadata).toEqual({ oracle: [] });
   });
 
-  it("rejects invalid chain IDs, malformed addresses, and non-EVM route entries before fetch", async () => {
+  it("rejects invalid chain IDs, malformed addresses, and conflicting namespaces before fetch", async () => {
     globalThis.fetch = Object.assign(
       async () => {
         throw new Error("unexpected fetch");
@@ -66,10 +71,19 @@ describe("EVM oracle quote filters", () => {
       { preconnect: originalFetch.preconnect },
     );
     const api = new IntentApi(false);
-    for (const chainId of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const chainId of [
+      0,
+      -1,
+      0n,
+      -1n,
+      1.5,
+      NaN,
+      Infinity,
+      Number.MAX_SAFE_INTEGER + 1,
+    ]) {
       await expect(
         api.getQuotes({ ...options, oracle: [{ chainId, address }] }),
-      ).rejects.toThrow("positive EVM integer");
+      ).rejects.toThrow("positive safe integer");
     }
     await expect(
       api.getQuotes({ ...options, oracle: [{ chainId: 1, address: "0x123" }] }),
@@ -80,6 +94,85 @@ describe("EVM oracle quote filters", () => {
         inputs: [{ ...options.inputs[0]!, namespace: "tron" }],
         oracle: [{ chainId: 1, address }],
       }),
-    ).rejects.toThrow("EVM chains only");
+    ).rejects.toThrow("namespace conflicts");
+  });
+
+  it("normalizes Stellar contracts and preserves both route namespaces", async () => {
+    const key = `0x${"12".repeat(32)}` as const;
+    const contract = bytes32ToStellarContract(key);
+    const stellarOptions = {
+      ...options,
+      outputs: [
+        {
+          receiver: bytes32ToStellarAccount(key),
+          asset: contract,
+          chainId: STELLAR_TESTNET_CHAIN_ID,
+          namespace: "stellar" as const,
+        },
+      ],
+    };
+    let captured: unknown;
+    globalThis.fetch = (async (input, init) => {
+      const request =
+        input instanceof Request ? input : new Request(input.toString(), init);
+      captured = await request.json();
+      return Response.json({ quotes: [] });
+    }) as typeof fetch;
+    for (const stellarOracle of [key, contract]) {
+      await new IntentApi(false).getQuotes({
+        ...stellarOptions,
+        oracle: [
+          { chainId: 1, address },
+          {
+            chainId: STELLAR_TESTNET_CHAIN_ID,
+            namespace: "stellar",
+            address: stellarOracle,
+          },
+        ],
+      });
+      expect(captured).toMatchObject({
+        intent: {
+          metadata: {
+            oracle: [
+              { chain: "eip155:1", address },
+              {
+                chain: `stellar:${STELLAR_TESTNET_CHAIN_ID}`,
+                address: contract,
+              },
+            ],
+          },
+        },
+      });
+    }
+    for (const invalid of [
+      bytes32ToStellarAccount(key),
+      "0x12",
+      contract.slice(0, -1) + "A",
+    ]) {
+      await expect(
+        new IntentApi(false).getQuotes({
+          ...stellarOptions,
+          oracle: [
+            {
+              chainId: STELLAR_TESTNET_CHAIN_ID,
+              namespace: "stellar",
+              address: invalid,
+            },
+          ],
+        }),
+      ).rejects.toThrow("Stellar C-address");
+    }
+    await expect(
+      new IntentApi(false).getQuotes({
+        ...stellarOptions,
+        oracle: [{ chainId: STELLAR_TESTNET_CHAIN_ID, address }],
+      }),
+    ).rejects.toThrow("namespace conflicts");
+    await expect(
+      new IntentApi(false).getQuotes({
+        ...options,
+        oracle: [{ chainId: 1, namespace: "stellar", address: contract }],
+      }),
+    ).rejects.toThrow("namespace conflicts");
   });
 });
