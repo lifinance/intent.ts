@@ -97,7 +97,7 @@ export class Intent {
 
   numInputChains() {
     const tokenChains = this.inputs.map(({ token }) => token.chainId);
-    return [...new Set(tokenChains)].length;
+    return new Set(tokenChains).size;
   }
 
   isMultichain() {
@@ -115,7 +115,7 @@ export class Intent {
     }
     const inputChain = firstInput.token.chainId;
     const outputChains = this.outputs.map((o) => o.token.chainId);
-    const numOutputChains = [...new Set(outputChains)].length;
+    const numOutputChains = new Set(outputChains).size;
     if (numOutputChains > 1) return false;
     const outputChain = firstOutput.token.chainId;
     return inputChain === outputChain;

@@ -70,12 +70,16 @@
     "build:smoke": "node ./scripts/smoke.mjs",
     "build": "bun run build:js && bun run build:types && bun run build:markers && bun run build:smoke",
     "prepare": "bun run build",
-    "lint:staged": "prettier -w",
+    "lint:staged": "oxfmt --no-error-on-unmatched-pattern",
     "prepublishOnly": "bun run build && bun run check && bun run test",
     "test": "bun test",
     "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p relay/axelar/tsconfig.json",
     "coverage": "bun run test --coverage",
-    "coverage:lcov": "bun run coverage --coverage-reporter='lcov' --coverage-dir='./'"
+    "coverage:lcov": "bun run coverage --coverage-reporter='lcov' --coverage-dir='./'",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "lint-staged": {
     "*.ts": [
@@ -94,7 +98,8 @@
     "bun": "^1.4.4",
     "husky": "9.1.7",
     "lint-staged": "16.1.0",
-    "prettier": "3.4.2",
+    "oxfmt": "0.76.0",
+    "oxlint": "1.91.0",
     "rollup": "^4.61.0",
     "rollup-plugin-esbuild": "^6.2.1",
     "typescript": "^5.6.3"
