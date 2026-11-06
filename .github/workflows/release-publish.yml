@@ -3,9 +3,9 @@ name: Release & Publish
 on:
   push:
     tags:
-      - 'v*.*.*-alpha.*'
-      - 'v*.*.*-beta.*'
-      - 'v*.*.*'
+      - "v*.*.*-alpha.*"
+      - "v*.*.*-beta.*"
+      - "v*.*.*"
 
 jobs:
   release:

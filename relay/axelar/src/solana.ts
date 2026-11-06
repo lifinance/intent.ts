@@ -184,7 +184,7 @@ export async function completed(
     if (step.position === undefined)
       throw new Error("Signature step requires a signer position");
     const bits = a.data[24 + Math.floor(step.position / 8)] ?? 0;
-    return Boolean(bits & (1 << step.position % 8));
+    return Boolean(bits & (1 << (step.position % 8)));
   }
   providerAccount(a, context.gateway, "IncomingMessage", 78);
   if (
