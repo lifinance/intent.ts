@@ -49,11 +49,13 @@ describe("Borsh", () => {
 
   it("reads a hand-written little-endian buffer", () => {
     const r = new BorshReader(
+      // oxlint-disable no-useless-spread -- groups bytes per field for readability
       Uint8Array.of(
         ...[0x04, 0x03, 0x02, 0x01],
         ...[0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01],
         ...[0x02, 0x01, ...Array(14).fill(0)],
         ...[2, 0, 0, 0, 0x68, 0x69],
+        // oxlint-enable no-useless-spread
       ),
     );
     expect([r.u32(), r.u64(), r.u128(), r.string()]).toEqual([

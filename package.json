@@ -77,7 +77,9 @@
     "coverage": "bun run test --coverage",
     "coverage:lcov": "bun run coverage --coverage-reporter='lcov' --coverage-dir='./'",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
   },
   "lint-staged": {
     "*.ts": [
@@ -97,6 +99,7 @@
     "husky": "9.1.7",
     "lint-staged": "16.1.0",
     "oxfmt": "0.76.0",
+    "oxlint": "1.91.0",
     "rollup": "^4.61.0",
     "rollup-plugin-esbuild": "^6.2.1",
     "typescript": "^5.6.3"

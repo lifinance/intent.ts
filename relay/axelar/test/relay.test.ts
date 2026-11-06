@@ -114,6 +114,7 @@ test("library builds bounded standard execution and registration transactions", 
     deployment({ ...manifest, routes: [...manifest.routes, duplicate] }, payer),
   ).toThrow(/duplicate/);
   // JSON numbers above 2^53 are already rounded; only exact decimal strings are accepted.
+  // oxlint-disable-next-line no-loss-of-precision -- intentionally unsafe integer under test
   const unsafe = 9007199254740993;
   expect(() => deployment({ ...manifest, chainId: unsafe }, payer)).toThrow(
     /decimal strings/,

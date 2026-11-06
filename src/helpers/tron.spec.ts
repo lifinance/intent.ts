@@ -77,7 +77,10 @@ describe("tronBase58ToHex", () => {
   it("throws on a valid-checksum payload of the wrong length", () => {
     // 0x41 prefix + only 19 body bytes, correctly checksummed.
     const short = base58check.encode(
-      new Uint8Array([TRON_ADDRESS_PREFIX, ...new Array(19).fill(7)]),
+      new Uint8Array([
+        TRON_ADDRESS_PREFIX,
+        ...Array.from({ length: 19 }, () => 7),
+      ]),
     );
     expect(() => tronBase58ToHex(short)).toThrow("21-byte payload");
   });
