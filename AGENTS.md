@@ -53,7 +53,10 @@ The library reads no environment. Two exceptions:
 
 ## Conventions
 
-- Addresses are 32-byte hex internally; convert native formats (base58, strkey) at the edges.
+- Address width depends on the field: `MandateOutput` fields (`oracle`, `settler`, `token`,
+  `recipient`) and Solana and Stellar addresses are 32-byte hex, while EVM input-side fields
+  (`user`, `inputOracle`, `inputSettler`) are 20-byte and order id hashing rejects padded ones.
+  Convert native formats (base58, strkey) with the helpers in `src/helpers/` at the edges.
 - Chain and oracle policy is injected through `IntentDeps`; the library never imports app config or
   mutates exported registries.
 - Changing an order encoding or id must keep `tests/vectors/` passing; those vectors are shared with
