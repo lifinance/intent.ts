@@ -343,10 +343,12 @@ export async function receiveContext(
     throw new Error("Source chain has no Solana Axelar mapping");
   const route = decodeAxelarRoute(routeAccount.data);
   if (
-    route.name !== job.message.cc_id.source_chain.toLowerCase() ||
+    route.name !==
+      job.message.cc_id.source_chain.replace(/[A-Z]/g, (c) =>
+        c.toLowerCase(),
+      ) ||
     route.chainId !== BigInt(job.source.chainId) ||
-    route.kind !== job.source.platform ||
-    route.kind === "solana"
+    job.source.platform === "solana"
   )
     throw new Error("Source chain mapping mismatch");
   return {
@@ -356,7 +358,6 @@ export async function receiveContext(
       message: job.message,
       payload: `0x${job.payload}`,
       sourceChainId: route.chainId,
-      sourceKind: route.kind,
     }),
     gateway: config.gateway,
   };

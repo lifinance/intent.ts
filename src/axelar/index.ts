@@ -19,11 +19,10 @@ import {
   utf8,
 } from "./bytes";
 import {
-  AXELAR_MAX_CHAIN_NAME,
-  type AxelarAddressKind,
   type AxelarMessage,
   axelarMessageHash,
   axelarCommandId,
+  checkAxelarChainName,
   checkMessageBounds,
   decodeAxelarAddress,
   messagePayloadHash,
@@ -34,10 +33,10 @@ import { base58 } from "@scure/base";
 export type { Hex, Bytes } from "./bytes";
 export {
   AXELAR_MAX_CHAIN_NAME,
-  type AxelarAddressKind,
   type AxelarMessage,
   axelarCommandId,
   axelarMessageHash,
+  checkAxelarChainName,
   decodeAxelarAddress,
 } from "./message";
 export { findSolanaProgramAddress } from "../helpers/solana";
@@ -135,7 +134,9 @@ export function axelarRouteAddress(name: string): string {
   );
 }
 
-const KINDS: readonly AxelarAddressKind[] = ["evm", "stellar", "solana"];
+/** Reverse-mapping PDA `["route-chain", chainId u128 LE]`; `submit` resolves the destination name through it. */
+export const axelarRouteChainAddress = (chainId: bigint) =>
+  pda(AXELAR_ORACLE_PROGRAM, "route-chain", u128Le(chainId));
 
 function account(data: Bytes, name: string): BorshReader {
   const bytes = toBytes(data);
@@ -162,14 +163,13 @@ export function decodeAxelarConfig(data: Bytes) {
   };
 }
 
+/** Decodes `AxelarRoute` account data, stored identically at both mapping PDAs. */
 export function decodeAxelarRoute(data: Bytes) {
   const r = account(data, "AxelarRoute");
   r.u8();
   const name = r.string();
   const chainId = r.u128();
-  const kind = KINDS[r.u8()];
-  if (!kind) throw new Error("Unknown Axelar address kind");
-  return { name, chainId, kind };
+  return { name, chainId };
 }
 
 /**
@@ -183,6 +183,7 @@ export function axelarInitializeInstruction(a: {
   gasService: string;
   chainName: string;
 }): AxelarInstruction {
+  checkAxelarChainName(a.chainName);
   const program = AXELAR_ORACLE_PROGRAM;
   return instruction(
     program,
@@ -232,13 +233,8 @@ export function axelarSetChainMappingInstruction(a: {
   owner: string;
   name: string;
   chainId: bigint;
-  kind: AxelarAddressKind;
 }): AxelarInstruction {
-  // Borsh `AddressKind` index.
-  const kind = KINDS.indexOf(a.kind);
-  if (kind < 0) throw new Error("Unknown route kind");
-  if (!/^[a-z0-9-]+$/.test(a.name) || a.name.length > AXELAR_MAX_CHAIN_NAME)
-    throw new Error("Axelar chain name must be 1-20 bytes of a-z, 0-9 or '-'");
+  checkAxelarChainName(a.name);
   if (a.chainId <= 0n) throw new Error("Chain ID must be a nonzero u128");
   const program = AXELAR_ORACLE_PROGRAM;
   return instruction(
@@ -248,10 +244,10 @@ export function axelarSetChainMappingInstruction(a: {
       payer(a.owner),
       ro(axelarConfigAddress()),
       rw(axelarRouteAddress(a.name)),
-      rw(pda(program, "route-chain", u128Le(a.chainId))),
+      rw(axelarRouteChainAddress(a.chainId)),
       ro(SYSTEM_PROGRAM),
     ],
-    new BorshWriter().string(a.name).u128(a.chainId).u8(kind),
+    new BorshWriter().string(a.name).u128(a.chainId),
   );
 }
 
@@ -297,18 +293,21 @@ function payloadCommitment(payload: Uint8Array): Uint8Array {
 
 /**
  * `submit` (non-consuming, default) or `submit_consume` (closes the source local
- * attestation; `payer` must be its recorded rent recipient). `Relayed` requires a
- * positive gas payment; `SelfRelay` requires exactly zero and passes no gas-service
- * accounts. `destinationConfig` is the remote configuration account of a Solana-kind
- * route (wrapped in the executable envelope) and must be zero (the default) otherwise.
+ * attestation; `payer` must be its recorded rent recipient). The destination
+ * name comes from the owner mapping of `destinationChainId`; `recipientOracle`
+ * is forwarded verbatim (Axelar rejects an unroutable recipient only later, after
+ * gas is paid). `Relayed` requires a positive gas payment; `SelfRelay` requires
+ * exactly zero and passes no gas-service accounts. A nonzero `destinationConfig`
+ * (the remote Solana configuration account) wraps the message in the executable
+ * envelope and limits the proof to 320 bytes; zero (the default) sends it raw.
  */
 export function axelarSubmitInstruction(a: {
   payer: string;
   gateway: string;
   gasService: string;
   source: string;
-  destinationChain: string;
-  recipientOracle: Hex;
+  destinationChainId: bigint;
+  recipientOracle: string;
   payload: Bytes;
   gasAmount: bigint;
   destinationConfig?: Hex;
@@ -317,7 +316,13 @@ export function axelarSubmitInstruction(a: {
 }): AxelarInstruction {
   const program = AXELAR_ORACLE_PROGRAM;
   const payload = toBytes(a.payload);
-  if (payload.length > AXELAR_MAX_PROOF_BYTES)
+  const config = bytes32(
+    a.destinationConfig ?? ZERO_CONFIG,
+    "destinationConfig",
+  );
+  if (a.destinationChainId <= 0n || a.destinationChainId >= 2n ** 128n)
+    throw new Error("Axelar destination chain ID must be a nonzero u128");
+  if (config.some((b) => b !== 0) && payload.length > AXELAR_MAX_PROOF_BYTES)
     throw new Error("Proof exceeds 320 bytes");
   if (a.deliveryMode !== "Relayed" && a.deliveryMode !== "SelfRelay")
     throw new Error("Unknown delivery mode");
@@ -333,7 +338,7 @@ export function axelarSubmitInstruction(a: {
   const keys = [
     payer(a.payer),
     ro(axelarConfigAddress()),
-    ro(axelarRouteAddress(a.destinationChain)),
+    ro(axelarRouteChainAddress(a.destinationChainId)),
     ro(program),
     ro(pda(program, "gtw-call-contract")),
     ro(a.gateway),
@@ -362,12 +367,12 @@ export function axelarSubmitInstruction(a: {
     a.consume ? "submit_consume" : "submit",
     keys,
     new BorshWriter()
-      .string(a.destinationChain)
-      .raw(bytes32(a.recipientOracle, "recipientOracle"))
+      .u128(a.destinationChainId)
+      .string(a.recipientOracle)
       .raw(pubkey(a.source))
       .bytes(payload)
       .u64(a.gasAmount)
-      .raw(bytes32(a.destinationConfig ?? ZERO_CONFIG, "destinationConfig"))
+      .raw(config)
       .u8(a.deliveryMode === "Relayed" ? 0 : 1),
   );
 }
@@ -544,7 +549,6 @@ export function axelarReceiveSteps(a: {
   message: AxelarMessage;
   payload: Bytes;
   sourceChainId: bigint;
-  sourceKind: AxelarAddressKind;
 }): AxelarReceivePlan {
   const m = a.message;
   checkMessageBounds(m);
@@ -581,9 +585,7 @@ export function axelarReceiveSteps(a: {
     throw new Error("Expected exactly one proof per Axelar message");
   if (a.sourceChainId <= 0n)
     throw new Error("Source chain ID must be a nonzero u128");
-  if (!KINDS.includes(a.sourceKind))
-    throw new Error("Unknown remote route kind");
-  const sender = decodeAxelarAddress(m.source_address, a.sourceKind);
+  const sender = decodeAxelarAddress(m.source_address);
   const command = toBytes(axelarCommandId(m));
   const g = a.gateway;
   const incoming = pda(g, "incoming message", command);

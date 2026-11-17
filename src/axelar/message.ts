@@ -13,10 +13,22 @@ export type AxelarMessage = {
   payload_hash: string;
 };
 
-export type AxelarAddressKind = "evm" | "stellar" | "solana";
+/**
+ * Longest inbound Axelar chain name in bytes: the EVM `AxelarStrings` lookup bound
+ * and the Solana program's `MAX_CHAIN_NAME`.
+ */
+export const AXELAR_MAX_CHAIN_NAME = 32;
 
-/** Axelar `ChainNameRaw::MAX_LEN`. */
-export const AXELAR_MAX_CHAIN_NAME = 20;
+/**
+ * Owner chain-map name rule shared with EVM `AxelarOracle.setChainMap`: an Axelar
+ * `ChainNameRaw` in lowercase form, 1-20 ASCII bytes without NUL, `_` or ASCII uppercase.
+ */
+export function checkAxelarChainName(name: string): void {
+  if (!/^[\x01-\x7f]{1,20}$/.test(name) || /[A-Z_]/.test(name))
+    throw new Error(
+      "Axelar chain name must be 1-20 ASCII bytes without NUL, _ or ASCII uppercase",
+    );
+}
 
 // udigest 0.2 unambiguous encoding, as derived for `solana_axelar_std::Message`:
 // every leaf and list is postfixed by its u32-BE length, LEN_32 and its kind.
@@ -105,29 +117,27 @@ export function writeMessage(w: BorshWriter, m: AxelarMessage): BorshWriter {
 }
 
 /**
- * Strict Axelar transport address → 32-byte OIF identifier, matching
- * `oracle_axelar::address::decode`: lowercase-or-mixed `0x` + 40 hex for EVM
- * (left-padded), canonical Stellar contract strkey, canonical base58 for Solana.
+ * Strict Axelar transport address → 32-byte OIF identifier, matching EVM
+ * `AxelarStrings.decodeAddress` and `oracle_axelar::address::decode`: a `0x`
+ * prefix selects EVM (40 hex, either case, left-padded), 56 characters a
+ * canonical Stellar contract strkey, anything else canonical base58 for Solana.
  */
-export function decodeAxelarAddress(
-  value: string,
-  kind: AxelarAddressKind,
-): Uint8Array {
+export function decodeAxelarAddress(value: string): Uint8Array {
   const out = new Uint8Array(32);
-  if (kind === "solana") {
-    const key = pubkey(value);
-    if (base58.encode(key) !== value)
-      throw new Error("Non-canonical Solana address");
-    out.set(key);
-  } else if (kind === "evm") {
+  if (value.startsWith("0x")) {
     if (!/^0x[0-9a-fA-F]{40}$/.test(value))
       throw new Error("Invalid EVM address");
     for (let i = 0; i < 20; i++)
       out[12 + i] = parseInt(value.slice(2 + 2 * i, 4 + 2 * i), 16);
-  } else {
+  } else if (value.length === 56) {
     if (!isStellarContract(value))
       throw new Error("Invalid Stellar contract address");
     out.set(hexToBytes(stellarStrkeyToBytes32(value)));
+  } else {
+    const key = pubkey(value);
+    if (base58.encode(key) !== value)
+      throw new Error("Non-canonical Solana address");
+    out.set(key);
   }
   return out;
 }
